@@ -1,0 +1,43 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.camelot.merlin.sortire"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="34" />
+10
+11    <application
+11-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-18:19
+12        android:allowBackup="false"
+12-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:5:9-36
+13        android:debuggable="true"
+14        android:extractNativeLibs="false"
+15        android:label="Sortire"
+15-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:6:9-32
+16        android:testOnly="true"
+17        android:theme="@style/Theme.Sortire" >
+17-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:9-45
+18        <activity
+18-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:9:9-17:20
+19            android:name="com.camelot.merlin.sortire.MainActivity"
+19-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:10:13-41
+20            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+20-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:12:13-87
+21            android:exported="true" >
+21-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:11:13-36
+22            <intent-filter>
+22-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:13:13-16:29
+23                <action android:name="android.intent.action.MAIN" />
+23-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:17-69
+23-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:25-66
+24
+25                <category android:name="android.intent.category.LAUNCHER" />
+25-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:17-77
+25-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:27-74
+26            </intent-filter>
+27        </activity>
+28    </application>
+29
+30</manifest>

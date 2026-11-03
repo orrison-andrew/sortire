@@ -38,27 +38,27 @@ enum class Setting(
     REVEAL_GAP_MS(Group.TIMING, "Order: gap between numbers", 450f, 100f, 1500f, 50f, "ms"),
 
     // Circles
-    RADIUS(Group.CIRCLES, "Circle radius", 52f, 20f, 120f, 2f, "dp"),
+    RADIUS(Group.CIRCLES, "Circle radius", 60f, 20f, 120f, 2f, "dp"),
     PULSE_AMOUNT(Group.CIRCLES, "Pulse amount", 0.06f, 0f, 0.3f, 0.01f),
-    PULSE_SPEED(Group.CIRCLES, "Pulse speed", 7f, 0f, 20f, 0.5f),
+    PULSE_SPEED(Group.CIRCLES, "Pulse speed", 3.5f, 0f, 20f, 0.5f),
 
     // Countdown ring
     RING_ENABLED(Group.RING, "Show countdown ring", 1f, isBool = true),
     RING_OFFSET(Group.RING, "Ring distance from circle", 14f, 0f, 40f, 1f, "dp"),
-    RING_STROKE(Group.RING, "Ring thickness", 6f, 1f, 20f, 1f, "dp"),
+    RING_STROKE(Group.RING, "Ring thickness", 7f, 1f, 20f, 1f, "dp"),
     RING_OPACITY(Group.RING, "Ring opacity", 0.9f, 0f, 1f, 0.05f),
 
     // Pick one result
     WINNER_FLOOD(Group.WINNER, "Winner floods the screen", 1f, isBool = true),
     WINNER_FADE_MS(Group.WINNER, "Losers fade-out time", 300f, 0f, 1500f, 50f, "ms"),
     WINNER_GROW_MS(Group.WINNER, "Winner grow time", 600f, 0f, 2000f, 50f, "ms"),
-    MARKER_RADIUS(Group.WINNER, "Marker ring size", 1.15f, 1f, 2f, 0.05f, "×"),
+    MARKER_RADIUS(Group.WINNER, "Marker ring size", 1.3f, 1f, 2f, 0.05f, "×"),
     MARKER_STROKE(Group.WINNER, "Marker ring thickness", 8f, 0f, 20f, 1f, "dp"),
-    MARKER_DOT(Group.WINNER, "Marker center dot size", 0.45f, 0f, 1f, 0.05f, "×"),
+    MARKER_DOT(Group.WINNER, "Marker center dot size", 0.2f, 0f, 1f, 0.05f, "×"),
 
     // Order result
-    ORDER_REVEALED_SCALE(Group.ORDER, "Revealed circle size", 1.1f, 0.5f, 2f, 0.05f, "×"),
-    ORDER_POP_AMOUNT(Group.ORDER, "Pop-in overshoot", 0.3f, 0f, 1f, 0.05f, "×"),
+    ORDER_REVEALED_SCALE(Group.ORDER, "Revealed circle size", 1.05f, 0.5f, 2f, 0.05f, "×"),
+    ORDER_POP_AMOUNT(Group.ORDER, "Pop-in overshoot", 0.25f, 0f, 1f, 0.05f, "×"),
     ORDER_POP_MS(Group.ORDER, "Pop-in time", 250f, 0f, 1000f, 25f, "ms"),
     ORDER_PENDING_SCALE(Group.ORDER, "Not-yet-revealed size", 0.8f, 0f, 1.5f, 0.05f, "×"),
     ORDER_PENDING_ALPHA(Group.ORDER, "Not-yet-revealed opacity", 0.35f, 0f, 1f, 0.05f),
@@ -66,8 +66,8 @@ enum class Setting(
 
     // Colors (changing these starts a fresh round)
     RANDOM_HUE(Group.COLORS, "Random base hue each round", 1f, isBool = true, resetsRound = true),
-    BASE_HUE(Group.COLORS, "Base hue (when not random)", 270f, 0f, 360f, 5f, "°", resetsRound = true),
-    HUE_STEP(Group.COLORS, "Hue step between fingers", 137.508f, 0f, 360f, 0.5f, "°", resetsRound = true),
+    BASE_HUE(Group.COLORS, "Base hue (when not random)", 260f, 0f, 360f, 5f, "°", resetsRound = true),
+    HUE_STEP(Group.COLORS, "Hue step between fingers", 137.5f, 0f, 360f, 0.5f, "°", resetsRound = true),
     SATURATION(Group.COLORS, "Circle saturation", 0.78f, 0f, 1f, 0.02f, resetsRound = true),
     VALUE_EVEN(Group.COLORS, "Brightness (1st, 3rd… finger)", 0.95f, 0f, 1f, 0.02f, resetsRound = true),
     VALUE_ODD(Group.COLORS, "Brightness (2nd, 4th… finger)", 0.85f, 0f, 1f, 0.02f, resetsRound = true),
@@ -81,8 +81,8 @@ enum class Setting(
 
     // Hint text
     HINT_ENABLED(Group.TEXT, "Show hint text", 1f, isBool = true),
-    HINT_SIZE(Group.TEXT, "Hint text size", 22f, 12f, 40f, 1f, "dp"),
-    HINT_OPACITY(Group.TEXT, "Hint text opacity", 0.7f, 0f, 1f, 0.05f);
+    HINT_SIZE(Group.TEXT, "Hint text size", 23f, 12f, 40f, 1f, "dp"),
+    HINT_OPACITY(Group.TEXT, "Hint text opacity", 0.35f, 0f, 1f, 0.05f);
 
     val key: String get() = name.lowercase()
 }

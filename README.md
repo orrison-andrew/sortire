@@ -30,7 +30,10 @@ Set your Team under Signing & Capabilities, change the bundle ID if you like, an
 (the simulator can't do multi‑touch well or haptics).
 
 ### Android (Android Studio Koala+, JDK 17)
-Open the `android/` folder in Android Studio, let it sync (it generates the Gradle wrapper), and run on a real device.
+Open the `android/` folder in Android Studio and let it sync, then run on a real device.
+The project is pinned to **Gradle 8.7** (via `gradle/wrapper/gradle-wrapper.properties`) to match Android Gradle Plugin 8.5.2.
+In Studio, *Settings > Build Tools > Gradle > Use Gradle from* should be **'gradle-wrapper.properties' file**.
+If you build from the command line with a newer system Gradle (9.x), it will fail; use the wrapper (`gradle wrapper --gradle-version 8.7` once, using a Gradle 8.x install) instead.
 
 ## Tuning (Android)
 Tap **Tune** (top right) to open the tuning panel. Every timing, size, animation, color and haptic
