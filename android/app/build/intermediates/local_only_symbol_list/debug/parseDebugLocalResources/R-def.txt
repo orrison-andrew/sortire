@@ -1,4 +1,4 @@
 R_DEF: Internal format may change without notice
 local
-color bg
+string app_name
 style Theme.Sortire

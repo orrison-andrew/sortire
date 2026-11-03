@@ -3,7 +3,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="Sortire"
+        android:label="@string/app_name"
         android:theme="@style/Theme.Sortire">
 
         <activity

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#16121C</color>
-    <style name="Theme.Sortire" parent="android:Theme.DeviceDefault.NoActionBar">
-        <item name="android:windowBackground">@color/bg</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+    <string name="app_name">Sortie!</string>
+    <style name="Theme.Sortire" parent="@android:style/Theme.Material.Light.NoActionBar">
     </style>
 </resources>
