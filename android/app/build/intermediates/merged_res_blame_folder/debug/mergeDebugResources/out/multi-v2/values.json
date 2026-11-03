@@ -1,0 +1,38 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.camelot.merlin.sortire.app-mergeDebugResources-2:/values/values.xml",
+            "map": [
+                {
+                    "source": "/Users/andrew.orrison/Documents/sortire/android/app/src/main/res/values/themes.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "12",
+                        "endOffsets": "368"
+                    },
+                    "to": {
+                        "startLines": "3",
+                        "startColumns": "4",
+                        "startOffsets": "92",
+                        "endLines": "7",
+                        "endColumns": "12",
+                        "endOffsets": "405"
+                    }
+                },
+                {
+                    "source": "/Users/andrew.orrison/Documents/sortire/android/app/src/main/res/values/colors.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "36",
+                        "endOffsets": "87"
+                    }
+                }
+            ]
+        }
+    ]
+}

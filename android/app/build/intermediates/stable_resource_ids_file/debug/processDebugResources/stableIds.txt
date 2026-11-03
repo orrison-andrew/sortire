@@ -1,0 +1,2 @@
+com.camelot.merlin.sortire:style/Theme.Sortire = 0x7f020000
+com.camelot.merlin.sortire:color/bg = 0x7f010000

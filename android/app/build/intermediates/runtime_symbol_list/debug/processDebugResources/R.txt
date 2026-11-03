@@ -1,0 +1,2 @@
+int color bg 0x7f010000
+int style Theme_Sortire 0x7f020000

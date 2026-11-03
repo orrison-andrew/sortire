@@ -1,2 +1,50 @@
-# sortire
-A choosing app for selecting who should go first in something
+# Sortire
+
+Put every finger on the screen. Sortire decides who goes first.
+
+Two modes (toggle at the bottom of the screen):
+
+- **Pick one** – after a 2‑second countdown one finger wins; the screen floods with the winner's color.
+- **Order all** – everyone gets a number (1, 2, 3 …) revealed one at a time.
+
+Works with any number of fingers. Each round uses a freshly generated random color palette.
+Haptic feedback on touch, on each reveal, and on the final result.
+
+Goal: **instant launch**. Both apps are fully native with zero third‑party dependencies.
+
+| Platform | Stack | Folder |
+|----------|-------|--------|
+| iPhone   | Swift + SwiftUI shell, UIKit touch/drawing view | `ios/` |
+| Android  | Kotlin, plain Views (no Compose/AndroidX)       | `android/` |
+
+## Build
+
+### iOS (Xcode 15+, iOS 16+)
+```sh
+brew install xcodegen
+cd ios
+xcodegen generate     # creates Sortire.xcodeproj from project.yml
+open Sortire.xcodeproj
+```
+Set your Team under Signing & Capabilities, change the bundle ID if you like, and run on a real device
+(the simulator can't do multi‑touch well or haptics).
+
+### Android (Android Studio Koala+, JDK 17)
+Open the `android/` folder in Android Studio, let it sync (it generates the Gradle wrapper), and run on a real device.
+
+## Tuning (Android)
+Tap **Tune** (top right) to open the tuning panel. Every timing, size, animation, color and haptic
+value is a live slider/switch, and the top of the screen stays usable so you can test touches while you tweak.
+- **Copy** puts all current values on the clipboard as `key = value` text, so you can paste them back
+  to lock in the defaults (and to mirror them in the iOS app).
+- **Reset** restores the built-in defaults.
+- Values persist between launches.
+- To add a new tunable, add one entry to the `Setting` enum in `Settings.kt`. It appears in the panel automatically.
+
+The iOS app still uses hard-coded constants at the top of `ArenaView`; it will be updated once the Android values are finalized.
+Palette logic is in `Palette.swift` / `Palette.kt` (golden-angle hue spacing from a base hue).
+
+## Behavior notes
+- Adding or removing a finger restarts the countdown. At least 2 fingers are needed.
+- After a result, keep fingers down as long as you like; a new round starts on the next touch once all fingers are lifted.
+- Switching modes resets the round.
