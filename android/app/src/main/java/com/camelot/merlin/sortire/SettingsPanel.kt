@@ -27,19 +27,19 @@ class SettingsPanel(
     private val onClose: () -> Unit
 ) : LinearLayout(context) {
 
-    private val list = LinearLayout(context).apply { orientation = VERTICAL }
+    private val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
     init {
-        orientation = VERTICAL
+        orientation = LinearLayout.VERTICAL
         isClickable = true   // swallow touches so they don't reach the arena underneath
         background = GradientDrawable().apply {
             setColor(Color.argb(244, 18, 18, 24))
             val r = dp(20).toFloat()
             cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
         }
-        addView(header(), LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        addView(header(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         val scroll = ScrollView(context).apply { addView(list) }
-        addView(scroll, LayoutParams(MATCH_PARENT, 0, 1f))
+        addView(scroll, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         build()
     }
 
@@ -53,12 +53,12 @@ class SettingsPanel(
             }
             list.addView(if (s.isBool) boolRow(s) else sliderRow(s))
         }
-        list.addView(View(context), LayoutParams(MATCH_PARENT, dp(32)))
+        list.addView(View(context), LinearLayout.LayoutParams(MATCH_PARENT, dp(32)))
     }
 
     private fun header(): View {
         val row = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(12), dp(12), dp(8))
         }
@@ -68,7 +68,7 @@ class SettingsPanel(
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
         }
-        row.addView(title, LayoutParams(0, WRAP_CONTENT, 1f))
+        row.addView(title, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         row.addView(pill("Copy") {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("Sortire settings", Settings.dump()))
@@ -93,7 +93,7 @@ class SettingsPanel(
             cornerRadius = dp(100).toFloat()
             setColor(Color.argb(60, 255, 255, 255))
         }
-        layoutParams = LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(8) }
+        layoutParams = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(8) }
         setOnClickListener { onClick() }
     }
 
@@ -108,10 +108,10 @@ class SettingsPanel(
 
     private fun sliderRow(s: Setting): View {
         val col = LinearLayout(context).apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(6), dp(16), dp(2))
         }
-        val top = LinearLayout(context).apply { orientation = HORIZONTAL }
+        val top = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         val name = TextView(context).apply {
             text = s.label
             setTextColor(Color.WHITE)
@@ -122,7 +122,7 @@ class SettingsPanel(
             setTextColor(Color.argb(200, 255, 255, 255))
             textSize = 14f
         }
-        top.addView(name, LayoutParams(0, WRAP_CONTENT, 1f))
+        top.addView(name, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         top.addView(value)
 
         val seek = SeekBar(context).apply {
@@ -140,8 +140,8 @@ class SettingsPanel(
                 override fun onStopTrackingTouch(sb: SeekBar) {}
             })
         }
-        col.addView(top, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        col.addView(seek, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        col.addView(top, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        col.addView(seek, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         return col
     }
 

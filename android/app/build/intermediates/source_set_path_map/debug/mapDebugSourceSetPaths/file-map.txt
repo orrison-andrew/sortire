@@ -1,7 +1,0 @@
-com.camelot.merlin.sortire.app-pngs-0 /Users/andrew.orrison/Documents/sortire/android/app/build/generated/res/pngs/debug
-com.camelot.merlin.sortire.app-resValues-1 /Users/andrew.orrison/Documents/sortire/android/app/build/generated/res/resValues/debug
-com.camelot.merlin.sortire.app-packageDebugResources-2 /Users/andrew.orrison/Documents/sortire/android/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-com.camelot.merlin.sortire.app-packageDebugResources-3 /Users/andrew.orrison/Documents/sortire/android/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-com.camelot.merlin.sortire.app-debug-4 /Users/andrew.orrison/Documents/sortire/android/app/build/intermediates/merged_res/debug/mergeDebugResources
-com.camelot.merlin.sortire.app-debug-5 /Users/andrew.orrison/Documents/sortire/android/app/src/debug/res
-com.camelot.merlin.sortire.app-main-6 /Users/andrew.orrison/Documents/sortire/android/app/src/main/res
