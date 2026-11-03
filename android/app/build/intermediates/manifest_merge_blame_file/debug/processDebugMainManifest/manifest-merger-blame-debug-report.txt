@@ -9,34 +9,38 @@
 9        android:targetSdkVersion="34" />
 10
 11    <application
-11-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-18:19
+11-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-20:19
 12        android:allowBackup="false"
 12-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:5:9-36
 13        android:debuggable="true"
 14        android:extractNativeLibs="false"
-15        android:label="@string/app_name"
-15-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:6:9-41
-16        android:theme="@style/Theme.Sortire" >
-16-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:9-45
-17        <activity
-17-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:9:9-17:20
-18            android:name="com.camelot.merlin.sortire.MainActivity"
-18-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:10:13-41
-19            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-19-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:12:13-87
-20            android:exported="true" >
-20-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:11:13-36
-21            <intent-filter>
-21-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:13:13-16:29
-22                <action android:name="android.intent.action.MAIN" />
-22-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:17-69
-22-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:25-66
-23
-24                <category android:name="android.intent.category.LAUNCHER" />
-24-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:17-77
-24-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:27-74
-25            </intent-filter>
-26        </activity>
-27    </application>
-28
-29</manifest>
+15        android:icon="@mipmap/ic_launcher"
+15-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:6:9-43
+16        android:label="@string/app_name"
+16-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:8:9-41
+17        android:roundIcon="@mipmap/ic_launcher_round"
+17-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:9-54
+18        android:theme="@style/Theme.Sortire" >
+18-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:9:9-45
+19        <activity
+19-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:11:9-19:20
+20            android:name="com.camelot.merlin.sortire.MainActivity"
+20-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:12:13-41
+21            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+21-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:13-87
+22            android:exported="true" >
+22-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:13:13-36
+23            <intent-filter>
+23-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:13-18:29
+24                <action android:name="android.intent.action.MAIN" />
+24-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:16:17-69
+24-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:16:25-66
+25
+26                <category android:name="android.intent.category.LAUNCHER" />
+26-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:17:17-77
+26-->/Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:17:27-74
+27            </intent-filter>
+28        </activity>
+29    </application>
+30
+31</manifest>

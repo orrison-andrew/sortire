@@ -27,6 +27,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "sortie-${variant.name}.apk"
+        }
+    }
 }
 
 // Intentionally no dependencies: plain Android Views = smallest APK, fastest cold start.

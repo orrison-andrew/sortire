@@ -6,6 +6,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -54,7 +56,7 @@ class MainActivity : Activity() {
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
-        hideSystemBars()
+        setupImmersiveMode()
 
         val prefs = getSharedPreferences("sortire", MODE_PRIVATE)
         val saved = runCatching { Mode.valueOf(prefs.getString("mode", Mode.FIRST.name)!!) }
@@ -64,7 +66,7 @@ class MainActivity : Activity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars()
+        if (hasFocus) setupImmersiveMode()
     }
 
     @Deprecated("Deprecated in Java")
@@ -125,11 +127,11 @@ class MainActivity : Activity() {
     }
 
     private fun buildTuneButton() = TextView(this).apply {
-        text = "Tune"
-        textSize = 14f
-        typeface = Typeface.DEFAULT_BOLD
+        text = "⚙"
+        textSize = 22f
+        gravity = Gravity.CENTER
         setTextColor(Color.WHITE)
-        setPadding(dp(16), dp(8), dp(16), dp(8))
+        setPadding(dp(12), dp(10), dp(12), dp(10))
         background = GradientDrawable().apply {
             cornerRadius = dp(100).toFloat()
             setColor(Color.argb(90, 0, 0, 0))
@@ -137,15 +139,32 @@ class MainActivity : Activity() {
         setOnClickListener { openPanel() }
     }
 
-    @Suppress("DEPRECATION")
-    private fun hideSystemBars() {
+
+    private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= 30) {
             window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.systemBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            window.insetsController?.let { controller ->
+                controller.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsets.Type.systemBars())
+
+                val hideHandler = Handler(Looper.getMainLooper())
+                val hideRunnable = Runnable {
+                    controller.hide(WindowInsets.Type.systemBars())
+                }
+
+                window.decorView.setOnApplyWindowInsetsListener { view, insets ->
+                    val navVisible = insets.isVisible(WindowInsets.Type.navigationBars())
+                    val statusVisible = insets.isVisible(WindowInsets.Type.statusBars())
+                    if (navVisible || statusVisible) {
+                        hideHandler.removeCallbacks(hideRunnable)
+                        hideHandler.postDelayed(hideRunnable, 6000L) // Stay visible for 6 seconds
+                    }
+                    view.onApplyWindowInsets(insets)
+                }
             }
         } else {
+            @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                     or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
