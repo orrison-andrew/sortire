@@ -107,12 +107,14 @@ class ArenaView(context: Context) : View(context) {
         }
         fingers[id] = Finger(x, y, palette.color(nextColorIndex++))
         haptic(Haptic.TAP)
+        SoundManager.playPop()
         restartCountdown()
     }
 
     private fun liftFinger(id: Int) {
         val fg = fingers[id] ?: return
         if (!fg.down) return
+        SoundManager.playPop()
         if (phase == Phase.RESULT) {
             fg.down = false                   // keep it on screen as part of the result
         } else {
@@ -150,6 +152,7 @@ class ArenaView(context: Context) : View(context) {
                 winnerId = ids.random()
                 animationEnd = now + max(f(Setting.WINNER_FADE_MS), f(Setting.WINNER_GROW_MS)).toLong() + 200
                 haptic(Haptic.SUCCESS)
+                SoundManager.playWinnerSound(context)
             }
             Mode.ORDER -> {
                 ranking = ids.shuffled()
@@ -164,7 +167,13 @@ class ArenaView(context: Context) : View(context) {
         val target = min(ranking.size, ((now - resultStart) / revealGapMs).toInt() + 1)
         while (revealed < target) {
             revealed++
-            haptic(if (revealed == ranking.size) Haptic.SUCCESS else Haptic.TICK)
+            val isSuccess = revealed == ranking.size
+            haptic(if (isSuccess) Haptic.SUCCESS else Haptic.TICK)
+            if (isSuccess) {
+                SoundManager.playWinnerSound(context)
+            } else {
+                SoundManager.playClick()
+            }
         }
     }
 
@@ -186,9 +195,40 @@ class ArenaView(context: Context) : View(context) {
             Haptic.SUCCESS -> on(Setting.HAPTIC_RESULT)
         }
         if (!enabled) return
+
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            }
+
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= 26) {
+                    val duration = when (kind) {
+                        Haptic.TAP -> 45L
+                        Haptic.TICK -> 35L
+                        Haptic.SUCCESS -> 100L
+                    }
+                    val amplitude = when (kind) {
+                        Haptic.TAP -> android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                        Haptic.TICK -> 200
+                        Haptic.SUCCESS -> 255
+                    }
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(duration, amplitude))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(if (kind == Haptic.SUCCESS) 90L else 45L)
+                }
+                return
+            }
+        } catch (_: Exception) {}
+
         val constant = when (kind) {
-            Haptic.TAP -> HapticFeedbackConstants.KEYBOARD_TAP
-            Haptic.TICK -> HapticFeedbackConstants.CONTEXT_CLICK
+            Haptic.TAP -> HapticFeedbackConstants.LONG_PRESS
+            Haptic.TICK -> HapticFeedbackConstants.KEYBOARD_TAP
             Haptic.SUCCESS ->
                 if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM
                 else HapticFeedbackConstants.LONG_PRESS

@@ -22,28 +22,26 @@ import android.widget.TextView
 class MainActivity : Activity() {
 
     private lateinit var arena: ArenaView
-    private lateinit var modeToggle: View
     private lateinit var tuneButton: View
     private lateinit var panel: SettingsPanel
-    private val labels = LinkedHashMap<Mode, TextView>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Settings.init(this)   // must happen before ArenaView is created
+        SoundManager.init(this)
 
         arena = ArenaView(this)
-        modeToggle = buildToggle()
         tuneButton = buildTuneButton()
-        panel = SettingsPanel(this, onChange = { arena.onSettingChanged(it) }, onClose = { closePanel() })
-            .apply { visibility = View.GONE }
+        panel = SettingsPanel(
+            this,
+            onChange = { arena.onSettingChanged(it) },
+            getCurrentMode = { arena.mode },
+            onModeChange = { mode -> select(mode) },
+            onClose = { closePanel() }
+        ).apply { visibility = View.GONE }
 
         val root = FrameLayout(this)
         root.addView(arena, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-        root.addView(
-            modeToggle,
-            FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
-                .apply { bottomMargin = dp(40) }
-        )
         root.addView(
             tuneButton,
             FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.END)
@@ -80,50 +78,17 @@ class MainActivity : Activity() {
         (panel.layoutParams as FrameLayout.LayoutParams).height = (h * if (landscape) 0.75f else 0.55f).toInt()
         panel.requestLayout()
         panel.visibility = View.VISIBLE
-        modeToggle.visibility = View.GONE
         tuneButton.visibility = View.GONE
     }
 
     private fun closePanel() {
         panel.visibility = View.GONE
-        modeToggle.visibility = View.VISIBLE
         tuneButton.visibility = View.VISIBLE
     }
 
     private fun select(mode: Mode, save: Boolean = true) {
         arena.mode = mode
         if (save) getSharedPreferences("sortire", MODE_PRIVATE).edit().putString("mode", mode.name).apply()
-        labels.forEach { (m, tv) ->
-            val selected = m == mode
-            tv.setTextColor(if (selected) Color.BLACK else Color.WHITE)
-            tv.background = if (selected) GradientDrawable().apply {
-                cornerRadius = dp(100).toFloat()
-                setColor(Color.argb(235, 255, 255, 255))
-            } else null
-        }
-    }
-
-    private fun buildToggle(): LinearLayout {
-        val box = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(100).toFloat()
-                setColor(Color.argb(90, 0, 0, 0))
-            }
-        }
-        for (m in Mode.values()) {
-            val tv = TextView(this).apply {
-                text = m.title
-                textSize = 15f
-                typeface = Typeface.DEFAULT_BOLD
-                setPadding(dp(20), dp(10), dp(20), dp(10))
-                setOnClickListener { select(m) }
-            }
-            labels[m] = tv
-            box.addView(tv)
-        }
-        return box
     }
 
     private fun buildTuneButton() = TextView(this).apply {
@@ -138,7 +103,6 @@ class MainActivity : Activity() {
         }
         setOnClickListener { openPanel() }
     }
-
 
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= 30) {

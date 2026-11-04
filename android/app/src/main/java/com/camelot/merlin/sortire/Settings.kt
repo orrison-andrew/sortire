@@ -65,16 +65,18 @@ enum class Setting(
     ORDER_TEXT_SCALE(Group.ORDER, "Number size", 0.95f, 0.3f, 2f, 0.05f, "×"),
 
     // Colors (changing these starts a fresh round)
-    RANDOM_HUE(Group.COLORS, "Random base hue each round", 1f, isBool = true, resetsRound = true),
+    RANDOM_HUE(Group.COLORS, "Random base hue each round", 0f, isBool = true, resetsRound = true),
     BASE_HUE(Group.COLORS, "Base hue (when not random)", 260f, 0f, 360f, 5f, "°", resetsRound = true),
-    HUE_STEP(Group.COLORS, "Hue step between fingers", 137.5f, 0f, 360f, 0.5f, "°", resetsRound = true),
     SATURATION(Group.COLORS, "Circle saturation", 0.78f, 0f, 1f, 0.02f, resetsRound = true),
+    HUE_STEP(Group.COLORS, "Hue step between fingers", 137.5f, 0f, 360f, 0.5f, "°", resetsRound = true),
     VALUE_EVEN(Group.COLORS, "Brightness (1st, 3rd… finger)", 0.95f, 0f, 1f, 0.02f, resetsRound = true),
     VALUE_ODD(Group.COLORS, "Brightness (2nd, 4th… finger)", 0.85f, 0f, 1f, 0.02f, resetsRound = true),
     BG_SATURATION(Group.COLORS, "Background saturation", 0.45f, 0f, 1f, 0.02f, resetsRound = true),
     BG_VALUE(Group.COLORS, "Background brightness", 0.14f, 0f, 1f, 0.02f, resetsRound = true),
 
     // Haptics
+    SOUND_ENABLED(Group.HAPTICS, "Enable sound effects", 1f, isBool = true),
+    SOUND_STYLE(Group.HAPTICS, "Pop sound style", 0f, 0f, 9f, 1f, ""),
     HAPTIC_TAP(Group.HAPTICS, "Buzz on finger down", 1f, isBool = true),
     HAPTIC_TICK(Group.HAPTICS, "Buzz on each number reveal", 1f, isBool = true),
     HAPTIC_RESULT(Group.HAPTICS, "Buzz on final result", 1f, isBool = true),
@@ -103,7 +105,13 @@ object Settings {
 
     fun set(s: Setting, v: Float) {
         values[s.ordinal] = v
-        prefs?.edit()?.putFloat(s.key, v)?.apply()
+        val editor = prefs?.edit()
+        editor?.putFloat(s.key, v)
+        if (s == Setting.BASE_HUE) {
+            values[Setting.RANDOM_HUE.ordinal] = 0f
+            editor?.putFloat(Setting.RANDOM_HUE.key, 0f)
+        }
+        editor?.apply()
     }
 
     fun resetAll() {
@@ -128,6 +136,21 @@ object Settings {
     }.trim()
 
     fun format(s: Setting, v: Float): String {
+        if (s == Setting.SOUND_STYLE) {
+            return when (v.toInt()) {
+                0 -> "Pop"
+                1 -> "Bubble"
+                2 -> "Blip"
+                3 -> "Laser"
+                4 -> "Snap"
+                5 -> "Beep"
+                6 -> "Thud"
+                7 -> "Ping"
+                8 -> "Boing"
+                9 -> "Click"
+                else -> "Pop"
+            }
+        }
         if (s.isBool) return if (v >= 0.5f) "on" else "off"
         val decimals = when {
             s.step >= 1f -> 0

@@ -1,9 +1,61 @@
 -- Merging decision tree log ---
+provider#androidx.core.content.FileProvider
+INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:24:9-32:20
+	android:grantUriPermissions
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:28:13-47
+	android:authorities
+		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:26:13-64
+	android:exported
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:25:13-62
 manifest
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-21:12
-INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-21:12
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:1-34:12
+MERGED from [com.google.android.material:material:1.12.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a2527c33e4655529fd67071ab3fc938b/transformed/material-1.12.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/15fefddade141e1ff59357d0ed4084d4/transformed/constraintlayout-2.0.1/AndroidManifest.xml:2:1-11:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3bb656b229280a69dc020e203372e68f/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/eb757ad6a6caa3dc693ff1aa572d62f6/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.viewpager2:viewpager2:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c12fcaf38d31421de92a2e6338307ab8/transformed/viewpager2-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.fragment:fragment:1.3.6] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1bd93cdc0366faae45a37d24c86d73ed/transformed/fragment-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.activity:activity:1.8.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/f9eec7c6ff488f24b8428b1b4eebdfdb/transformed/activity-1.8.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3f1b5aeb88dd294a66975357be0061c8/transformed/coordinatorlayout-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e47990e30f7d88864b7b905ad04726af/transformed/drawerlayout-1.1.1/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.transition:transition:1.5.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/177f5293ffef59ca06981d7ff402a0cf/transformed/transition-1.5.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.dynamicanimation:dynamicanimation:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/401d827525d99aafd496b858d3f52773/transformed/dynamicanimation-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ba9678840a8d67a34907f9c9b0c619f6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d88bc69673eaeebd512eb990b4d0b33f/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1e294fe043837125c9ab2faa69aa9cc1/transformed/emoji2-views-helper-1.2.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.recyclerview:recyclerview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a442c9a64652a1f9a5e539133b48e47d/transformed/recyclerview-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/744dc998f478b504e3d2ca5c1ca84521/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a3162196b351b03cb69aa2221560b941/transformed/customview-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/b48dc7be028238df3243f154e62bf05f/transformed/legacy-support-core-utils-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/490c0d3f59e921f73ad08477e166bb57/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b555f50ab54b4740d9edb245159e1e2/transformed/savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/60273744415eb67c2bbda64470f6476d/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d6d5891a696aa3710e7fdeaa35a45193/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5a01edcfd6a8cd196eb74c200898cbd9/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b9bbca0148da7ff56d9fbae6ca37f80/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/bfa5ecff556cc19df7d80e86b48cd0e8/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.core:core-ktx:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ed1e2539c76433c320cf657feda3b6d4/transformed/core-ktx-1.13.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/aebfd05e5188257b84cd37796f56b8a9/transformed/annotation-experimental-1.4.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.cardview:cardview:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/530307f15a05181a63cc7db2f1d95975/transformed/cardview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/08d711689cabcefd5867151692a9119a/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/877a245e5714b1678f7f866195000a3b/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:17:1-55:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/73ea4898c9aa2804aece9e7457850970/transformed/tracing-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/783af4d18345e1cb2e7e7fc7d87ff15d/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5ea6784b530ae1184fbecf79bec2a2d2/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.documentfile:documentfile:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/16f6aedf02c6bdf2c47e35b54c74fd7e/transformed/documentfile-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e443a87daa8c46b8c571e3f0158fdd0c/transformed/localbroadcastmanager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.print:print:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/920233589b01a7c0d7955496e82f50ff/transformed/print-1.0.0/AndroidManifest.xml:17:1-22:12
 	package
 		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
 	android:versionName
@@ -12,44 +64,248 @@ INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/s
 		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
 	xmlns:android
 		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.VIBRATE
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-66
+	android:name
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:22-63
+uses-permission#android.permission.RECORD_AUDIO
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:5:5-71
+	android:name
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:5:22-68
 application
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-20:19
-INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:4:5-20:19
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:5-33:19
+INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:5-33:19
+MERGED from [com.google.android.material:material:1.12.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a2527c33e4655529fd67071ab3fc938b/transformed/material-1.12.0/AndroidManifest.xml:22:5-20
+MERGED from [com.google.android.material:material:1.12.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a2527c33e4655529fd67071ab3fc938b/transformed/material-1.12.0/AndroidManifest.xml:22:5-20
+MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/15fefddade141e1ff59357d0ed4084d4/transformed/constraintlayout-2.0.1/AndroidManifest.xml:9:5-20
+MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/15fefddade141e1ff59357d0ed4084d4/transformed/constraintlayout-2.0.1/AndroidManifest.xml:9:5-20
+MERGED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/877a245e5714b1678f7f866195000a3b/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/877a245e5714b1678f7f866195000a3b/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
 	android:extractNativeLibs
 		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
 	android:label
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:8:9-41
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:11:9-41
 	android:roundIcon
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:7:9-54
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:10:9-54
 	android:icon
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:6:9-43
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:9:9-43
 	android:allowBackup
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:5:9-36
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:8:9-36
 	android:theme
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:9:9-45
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:12:9-45
 activity#com.camelot.merlin.sortire.MainActivity
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:11:9-19:20
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:9-22:20
 	android:exported
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:13:13-36
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:16:13-36
 	android:configChanges
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:14:13-87
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:17:13-87
 	android:name
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:12:13-41
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:15:13-18:29
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:18:13-21:29
 action#android.intent.action.MAIN
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:16:17-69
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:19:17-69
 	android:name
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:16:25-66
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:19:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:17:17-77
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:20:17-77
 	android:name
-		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:17:27-74
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:20:27-74
+meta-data#android.support.FILE_PROVIDER_PATHS
+ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:29:13-31:54
+	android:resource
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:31:17-51
+	android:name
+		ADDED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml:30:17-67
 uses-sdk
 INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
 INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
+MERGED from [com.google.android.material:material:1.12.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a2527c33e4655529fd67071ab3fc938b/transformed/material-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [com.google.android.material:material:1.12.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a2527c33e4655529fd67071ab3fc938b/transformed/material-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/15fefddade141e1ff59357d0ed4084d4/transformed/constraintlayout-2.0.1/AndroidManifest.xml:5:5-7:41
+MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/15fefddade141e1ff59357d0ed4084d4/transformed/constraintlayout-2.0.1/AndroidManifest.xml:5:5-7:41
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3bb656b229280a69dc020e203372e68f/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3bb656b229280a69dc020e203372e68f/transformed/appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/eb757ad6a6caa3dc693ff1aa572d62f6/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/eb757ad6a6caa3dc693ff1aa572d62f6/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager2:viewpager2:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c12fcaf38d31421de92a2e6338307ab8/transformed/viewpager2-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager2:viewpager2:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c12fcaf38d31421de92a2e6338307ab8/transformed/viewpager2-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1bd93cdc0366faae45a37d24c86d73ed/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1bd93cdc0366faae45a37d24c86d73ed/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.activity:activity:1.8.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/f9eec7c6ff488f24b8428b1b4eebdfdb/transformed/activity-1.8.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.8.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/f9eec7c6ff488f24b8428b1b4eebdfdb/transformed/activity-1.8.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3f1b5aeb88dd294a66975357be0061c8/transformed/coordinatorlayout-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.coordinatorlayout:coordinatorlayout:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3f1b5aeb88dd294a66975357be0061c8/transformed/coordinatorlayout-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.drawerlayout:drawerlayout:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e47990e30f7d88864b7b905ad04726af/transformed/drawerlayout-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.drawerlayout:drawerlayout:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e47990e30f7d88864b7b905ad04726af/transformed/drawerlayout-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.transition:transition:1.5.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/177f5293ffef59ca06981d7ff402a0cf/transformed/transition-1.5.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.transition:transition:1.5.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/177f5293ffef59ca06981d7ff402a0cf/transformed/transition-1.5.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.dynamicanimation:dynamicanimation:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/401d827525d99aafd496b858d3f52773/transformed/dynamicanimation-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.dynamicanimation:dynamicanimation:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/401d827525d99aafd496b858d3f52773/transformed/dynamicanimation-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ba9678840a8d67a34907f9c9b0c619f6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ba9678840a8d67a34907f9c9b0c619f6/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d88bc69673eaeebd512eb990b4d0b33f/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d88bc69673eaeebd512eb990b4d0b33f/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1e294fe043837125c9ab2faa69aa9cc1/transformed/emoji2-views-helper-1.2.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1e294fe043837125c9ab2faa69aa9cc1/transformed/emoji2-views-helper-1.2.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.recyclerview:recyclerview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a442c9a64652a1f9a5e539133b48e47d/transformed/recyclerview-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.recyclerview:recyclerview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a442c9a64652a1f9a5e539133b48e47d/transformed/recyclerview-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/744dc998f478b504e3d2ca5c1ca84521/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/744dc998f478b504e3d2ca5c1ca84521/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a3162196b351b03cb69aa2221560b941/transformed/customview-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.customview:customview:1.1.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/a3162196b351b03cb69aa2221560b941/transformed/customview-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/b48dc7be028238df3243f154e62bf05f/transformed/legacy-support-core-utils-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.legacy:legacy-support-core-utils:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/b48dc7be028238df3243f154e62bf05f/transformed/legacy-support-core-utils-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/490c0d3f59e921f73ad08477e166bb57/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/490c0d3f59e921f73ad08477e166bb57/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b555f50ab54b4740d9edb245159e1e2/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b555f50ab54b4740d9edb245159e1e2/transformed/savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/60273744415eb67c2bbda64470f6476d/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/60273744415eb67c2bbda64470f6476d/transformed/lifecycle-livedata-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d6d5891a696aa3710e7fdeaa35a45193/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/d6d5891a696aa3710e7fdeaa35a45193/transformed/lifecycle-livedata-core-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5a01edcfd6a8cd196eb74c200898cbd9/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5a01edcfd6a8cd196eb74c200898cbd9/transformed/lifecycle-viewmodel-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b9bbca0148da7ff56d9fbae6ca37f80/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/6b9bbca0148da7ff56d9fbae6ca37f80/transformed/lifecycle-runtime-2.6.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/bfa5ecff556cc19df7d80e86b48cd0e8/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/bfa5ecff556cc19df7d80e86b48cd0e8/transformed/lifecycle-viewmodel-savedstate-2.6.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core-ktx:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ed1e2539c76433c320cf657feda3b6d4/transformed/core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/ed1e2539c76433c320cf657feda3b6d4/transformed/core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/aebfd05e5188257b84cd37796f56b8a9/transformed/annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/aebfd05e5188257b84cd37796f56b8a9/transformed/annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.cardview:cardview:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/530307f15a05181a63cc7db2f1d95975/transformed/cardview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cardview:cardview:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/530307f15a05181a63cc7db2f1d95975/transformed/cardview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/08d711689cabcefd5867151692a9119a/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/08d711689cabcefd5867151692a9119a/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/877a245e5714b1678f7f866195000a3b/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/877a245e5714b1678f7f866195000a3b/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/73ea4898c9aa2804aece9e7457850970/transformed/tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.tracing:tracing:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/73ea4898c9aa2804aece9e7457850970/transformed/tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/783af4d18345e1cb2e7e7fc7d87ff15d/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/783af4d18345e1cb2e7e7fc7d87ff15d/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5ea6784b530ae1184fbecf79bec2a2d2/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/5ea6784b530ae1184fbecf79bec2a2d2/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.documentfile:documentfile:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/16f6aedf02c6bdf2c47e35b54c74fd7e/transformed/documentfile-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.documentfile:documentfile:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/16f6aedf02c6bdf2c47e35b54c74fd7e/transformed/documentfile-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e443a87daa8c46b8c571e3f0158fdd0c/transformed/localbroadcastmanager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/e443a87daa8c46b8c571e3f0158fdd0c/transformed/localbroadcastmanager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.print:print:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/920233589b01a7c0d7955496e82f50ff/transformed/print-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.print:print:1.0.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/920233589b01a7c0d7955496e82f50ff/transformed/print-1.0.0/AndroidManifest.xml:20:5-44
 	android:targetSdkVersion
 		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
 	android:minSdkVersion
 		INJECTED from /Users/andrew.orrison/Documents/github-repos/sortire/android/app/src/main/AndroidManifest.xml
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/3a09b80c647faaefe4886eaee3bd5d63/transformed/startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c78c98302a7647fe53f71bb092e8b4be/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+permission#com.camelot.merlin.sortire.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+uses-permission#com.camelot.merlin.sortire.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/542b7336fca3ad5af4dd50ae21c428c2/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.6.2] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/1eb42d59ade5b9f2dc930f0403261fce/transformed/lifecycle-process-2.6.2/AndroidManifest.xml:30:17-78
+meta-data#androidx.profileinstaller.ProfileInstallerInitializer
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
+receiver#androidx.profileinstaller.ProfileInstallReceiver
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
+	android:enabled
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
+	android:exported
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
+	android:permission
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
+	android:directBootAware
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
+intent-filter#action:name:androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
+action#androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
+intent-filter#action:name:androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
+action#androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
+intent-filter#action:name:androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
+action#androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
+intent-filter#action:name:androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
+action#androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.0] /Users/andrew.orrison/.gradle/caches/8.14.6/transforms/c48a3e5da6ee19ea46c46a9c53fdd7d0/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
