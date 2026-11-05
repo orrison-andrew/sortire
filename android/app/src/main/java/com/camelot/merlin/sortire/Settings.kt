@@ -9,8 +9,8 @@ enum class Group(val title: String) {
     RING("Countdown ring"),
     WINNER("Pick one: result"),
     ORDER("Order all: result"),
-    COLORS("Colors"),
-    HAPTICS("Haptics"),
+    COLORS("Color Controls"),
+    HAPTICS("Audio & Feedback"),
     TEXT("Hint text")
 }
 
@@ -37,7 +37,9 @@ enum class Setting(
     MIN_FINGERS(Group.TIMING, "Minimum fingers", 2f, 1f, 5f, 1f, "", resetsRound = true),
     REVEAL_GAP_MS(Group.TIMING, "Order: gap between numbers", 450f, 100f, 1500f, 50f, "ms"),
 
-    // Circles
+    // Circles / Appearance
+    WOOD_TYPE(Group.CIRCLES, "Wood type", 3f, 0f, 5f, 1f, ""),
+    RENDER_MODE(Group.CIRCLES, "Render mode", 0f, 0f, 1f, 1f, ""),
     RADIUS(Group.CIRCLES, "Circle radius", 60f, 20f, 120f, 2f, "dp"),
     PULSE_AMOUNT(Group.CIRCLES, "Pulse amount", 0.06f, 0f, 0.3f, 0.01f),
     PULSE_SPEED(Group.CIRCLES, "Pulse speed", 3.5f, 0f, 20f, 0.5f),
@@ -50,6 +52,7 @@ enum class Setting(
 
     // Pick one result
     WINNER_FLOOD(Group.WINNER, "Winner floods the screen", 1f, isBool = true),
+    MARKER_ENABLED(Group.WINNER, "Show winner marker ring", 1f, isBool = true),
     WINNER_FADE_MS(Group.WINNER, "Losers fade-out time", 300f, 0f, 1500f, 50f, "ms"),
     WINNER_GROW_MS(Group.WINNER, "Winner grow time", 600f, 0f, 2000f, 50f, "ms"),
     MARKER_RADIUS(Group.WINNER, "Marker ring size", 1.3f, 1f, 2f, 0.05f, "×"),
@@ -65,16 +68,17 @@ enum class Setting(
     ORDER_TEXT_SCALE(Group.ORDER, "Number size", 0.95f, 0.3f, 2f, 0.05f, "×"),
 
     // Colors (changing these starts a fresh round)
+    WOODGRAIN_ENABLED(Group.COLORS, "Enable woodgrain style", 0f, isBool = true, resetsRound = true),
     RANDOM_HUE(Group.COLORS, "Random base hue each round", 0f, isBool = true, resetsRound = true),
-    BASE_HUE(Group.COLORS, "Base hue (when not random)", 260f, 0f, 360f, 5f, "°", resetsRound = true),
+    BASE_HUE(Group.COLORS, "Base hue", 260f, 0f, 360f, 5f, "°", resetsRound = true),
+    BG_SATURATION(Group.COLORS, "Background saturation", 0.45f, 0f, 1f, 0.02f, resetsRound = true),
+    BG_VALUE(Group.COLORS, "Background brightness", 0.14f, 0f, 1f, 0.02f, resetsRound = true),
     SATURATION(Group.COLORS, "Circle saturation", 0.78f, 0f, 1f, 0.02f, resetsRound = true),
     HUE_STEP(Group.COLORS, "Hue step between fingers", 137.5f, 0f, 360f, 0.5f, "°", resetsRound = true),
     VALUE_EVEN(Group.COLORS, "Brightness (1st, 3rd… finger)", 0.95f, 0f, 1f, 0.02f, resetsRound = true),
     VALUE_ODD(Group.COLORS, "Brightness (2nd, 4th… finger)", 0.85f, 0f, 1f, 0.02f, resetsRound = true),
-    BG_SATURATION(Group.COLORS, "Background saturation", 0.45f, 0f, 1f, 0.02f, resetsRound = true),
-    BG_VALUE(Group.COLORS, "Background brightness", 0.14f, 0f, 1f, 0.02f, resetsRound = true),
 
-    // Haptics
+    // Haptics & Audio
     SOUND_ENABLED(Group.HAPTICS, "Enable sound effects", 1f, isBool = true),
     SOUND_STYLE(Group.HAPTICS, "Pop sound style", 0f, 0f, 9f, 1f, ""),
     HAPTIC_TAP(Group.HAPTICS, "Buzz on finger down", 1f, isBool = true),
@@ -136,6 +140,20 @@ object Settings {
     }.trim()
 
     fun format(s: Setting, v: Float): String {
+        if (s == Setting.WOOD_TYPE) {
+            return when (v.toInt()) {
+                0 -> "Maple"
+                1 -> "White Oak"
+                2 -> "Red Oak"
+                3 -> "Walnut"
+                4 -> "Ebony"
+                5 -> "Purpleheart"
+                else -> "Walnut"
+            }
+        }
+        if (s == Setting.RENDER_MODE) {
+            return if (v >= 0.5f) "3D Fast" else "2D"
+        }
         if (s == Setting.SOUND_STYLE) {
             return when (v.toInt()) {
                 0 -> "Pop"

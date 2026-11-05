@@ -1,6 +1,7 @@
 package com.camelot.merlin.sortire
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -15,6 +16,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -23,8 +25,9 @@ import kotlin.math.sin
  */
 class ArenaView(context: Context) : View(context) {
 
-    private class Finger(var x: Float, var y: Float, val color: Int) {
+    private inner class Finger(var x: Float, var y: Float, val color: Int, val discWoodType: WoodType, seed: Long) {
         var down = true
+        val puckBitmap: Bitmap = WoodgrainEngine.getWoodDiscBitmap((baseRadius * 2f).roundToInt(), discWoodType, seed)
     }
 
     private enum class Phase { WAITING, COUNTING, RESULT }
@@ -57,7 +60,17 @@ class ArenaView(context: Context) : View(context) {
     private var ranking: List<Int> = emptyList()
     private var revealed = 0
 
+    private val woodType: WoodType
+        get() {
+            val idx = f(Setting.WOOD_TYPE).toInt().coerceIn(0, WoodType.values().size - 1)
+            return WoodType.values()[idx]
+        }
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -68,6 +81,7 @@ class ArenaView(context: Context) : View(context) {
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val arcRect = RectF()
+    private val bgDstRect = RectF()
 
     init {
         isHapticFeedbackEnabled = true
@@ -105,7 +119,10 @@ class ArenaView(context: Context) : View(context) {
             if (fingers.values.any { it.down }) return
             reset()
         }
-        fingers[id] = Finger(x, y, palette.color(nextColorIndex++))
+        val woodTypes = WoodType.values()
+        val discWood = woodTypes.random()
+        val randomSeed = kotlin.random.Random.nextLong()
+        fingers[id] = Finger(x, y, palette.color(nextColorIndex++), discWood, randomSeed)
         haptic(Haptic.TAP)
         SoundManager.playPop()
         restartCountdown()
@@ -245,7 +262,35 @@ class ArenaView(context: Context) : View(context) {
         if (phase == Phase.COUNTING && now - countdownStart >= countdownMs) resolve(now)
         if (phase == Phase.RESULT && mode == Mode.ORDER) advanceReveal(now)
 
-        canvas.drawColor(palette.background)
+        val w = fingers[winnerId]
+        if (phase == Phase.RESULT && mode == Mode.FIRST && on(Setting.WINNER_FLOOD) && w != null) {
+            val e = (now - resultStart) / 1000f
+            val growS = f(Setting.WINNER_GROW_MS) / 1000f
+            val t = if (growS <= 0f) 1f else min(1f, e / growS)
+            val grow = 1f - (1f - t).pow(3)
+
+            if (on(Setting.WOODGRAIN_ENABLED)) {
+                val bgWinner = WoodgrainEngine.getWoodBackgroundBitmap(w.discWoodType)
+                val bgOrig = WoodgrainEngine.getWoodBackgroundBitmap(woodType)
+                bgDstRect.set(0f, 0f, width.toFloat(), height.toFloat())
+                bitmapPaint.alpha = 255
+                canvas.drawBitmap(bgOrig, null, bgDstRect, bitmapPaint)
+                bitmapPaint.alpha = (grow.coerceIn(0f, 1f) * 255).toInt()
+                canvas.drawBitmap(bgWinner, null, bgDstRect, bitmapPaint)
+            } else {
+                val blendedColor = blendColors(palette.background, w.color, grow)
+                canvas.drawColor(blendedColor)
+            }
+        } else {
+            if (on(Setting.WOODGRAIN_ENABLED)) {
+                val bg = WoodgrainEngine.getWoodBackgroundBitmap(woodType)
+                bgDstRect.set(0f, 0f, width.toFloat(), height.toFloat())
+                bitmapPaint.alpha = 255
+                canvas.drawBitmap(bg, null, bgDstRect, bitmapPaint)
+            } else {
+                canvas.drawColor(palette.background)
+            }
+        }
 
         if (fingers.isEmpty()) {
             drawHint(canvas)
@@ -258,12 +303,23 @@ class ArenaView(context: Context) : View(context) {
         if (needsFrames(now)) postInvalidateOnAnimation()
     }
 
-    private fun circle(c: Canvas, x: Float, y: Float, r: Float, color: Int, alpha: Float = 1f) {
+    private fun circle(c: Canvas, fg: Finger, x: Float, y: Float, r: Float, color: Int, alpha: Float = 1f) {
         if (r <= 0f) return
-        paint.style = Paint.Style.FILL
-        paint.color = color
-        paint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
-        c.drawCircle(x, y, r, paint)
+        if (on(Setting.WOODGRAIN_ENABLED)) {
+            // Drop shadow behind wooden puck
+            shadowPaint.color = Color.argb((alpha * 90).toInt(), 0, 0, 0)
+            c.drawCircle(x + 5f * density, y + 7f * density, r + 2f * density, shadowPaint)
+
+            // Draw static wooden puck bitmap matching this finger's assigned wood species
+            val rect = RectF(x - r, y - r, x + r, y + r)
+            bitmapPaint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+            c.drawBitmap(fg.puckBitmap, null, rect, bitmapPaint)
+        } else {
+            paint.style = Paint.Style.FILL
+            paint.color = color
+            paint.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+            c.drawCircle(x, y, r, paint)
+        }
     }
 
     private fun drawLive(c: Canvas, now: Long) {
@@ -273,16 +329,17 @@ class ArenaView(context: Context) : View(context) {
         val showRing = phase == Phase.COUNTING && on(Setting.RING_ENABLED)
         if (showRing) {
             ringPaint.strokeWidth = f(Setting.RING_STROKE) * density
-            ringPaint.color = Color.WHITE
             ringPaint.alpha = (f(Setting.RING_OPACITY) * 255).toInt()
         }
         var i = 0
         for (fg in fingers.values) {
             val r = baseRadius * (1f + pulseAmount * sin(now / 1000f * pulseSpeed + i))
-            circle(c, fg.x, fg.y, r, fg.color)
+            circle(c, fg, fg.x, fg.y, r, fg.color)
             if (showRing) {
                 val rr = r + f(Setting.RING_OFFSET) * density
                 arcRect.set(fg.x - rr, fg.y - rr, fg.x + rr, fg.y + rr)
+                ringPaint.color = fg.color
+                ringPaint.alpha = (f(Setting.RING_OPACITY) * 255).toInt()
                 c.drawArc(arcRect, -90f, 360f * progress, false, ringPaint)
             }
             i++
@@ -295,26 +352,35 @@ class ArenaView(context: Context) : View(context) {
         val growS = f(Setting.WINNER_GROW_MS) / 1000f
         val fade = if (fadeS <= 0f) 0f else max(0f, 1f - e / fadeS)
         if (fade > 0f) {
-            for ((id, fg) in fingers) if (id != winnerId) circle(c, fg.x, fg.y, baseRadius, fg.color, fade)
+            for ((id, fg) in fingers) if (id != winnerId) circle(c, fg, fg.x, fg.y, baseRadius, fg.color, fade)
         }
         val w = fingers[winnerId] ?: return
         val t = if (growS <= 0f) 1f else min(1f, e / growS)
         val grow = 1f - (1f - t).pow(3)
-        val radius = if (on(Setting.WINNER_FLOOD)) {
-            val maxR = hypot(width.toFloat(), height.toFloat())
-            baseRadius + (maxR - baseRadius) * grow
-        } else {
-            baseRadius * (1f + 0.3f * grow)
-        }
-        circle(c, w.x, w.y, radius, w.color)
+        val radius = baseRadius * (1f + 0.3f * grow)
+        circle(c, w, w.x, w.y, radius, w.color)
 
-        // White marker so you can see exactly who was picked.
-        val stroke = f(Setting.MARKER_STROKE) * density
-        if (stroke > 0f) {
-            markerPaint.strokeWidth = stroke
-            c.drawCircle(w.x, w.y, baseRadius * f(Setting.MARKER_RADIUS), markerPaint)
+        // White marker so you can see exactly who was picked (toggleable in Settings).
+        if (on(Setting.MARKER_ENABLED)) {
+            val stroke = f(Setting.MARKER_STROKE) * density
+            if (stroke > 0f) {
+                markerPaint.strokeWidth = stroke
+                c.drawCircle(w.x, w.y, baseRadius * f(Setting.MARKER_RADIUS), markerPaint)
+            }
+            paint.style = Paint.Style.FILL
+            paint.color = Color.WHITE
+            c.drawCircle(w.x, w.y, baseRadius * f(Setting.MARKER_DOT) * grow, paint)
         }
-        circle(c, w.x, w.y, baseRadius * f(Setting.MARKER_DOT) * grow, Color.WHITE)
+    }
+
+    private fun blendColors(color1: Int, color2: Int, ratio: Float): Int {
+        val r = ratio.coerceIn(0f, 1f)
+        val ir = 1f - r
+        val a = Color.alpha(color1) * ir + Color.alpha(color2) * r
+        val red = Color.red(color1) * ir + Color.red(color2) * r
+        val green = Color.green(color1) * ir + Color.green(color2) * r
+        val blue = Color.blue(color1) * ir + Color.blue(color2) * r
+        return Color.argb(a.toInt(), red.toInt(), green.toInt(), blue.toInt())
     }
 
     private fun drawRanking(c: Canvas, now: Long) {
@@ -326,35 +392,32 @@ class ArenaView(context: Context) : View(context) {
                 val age = (now - (resultStart + k * revealGapMs)) / 1000f
                 val pop = if (popS <= 0f) 0f else max(0f, 1f - age / popS)
                 val r = baseRadius * (f(Setting.ORDER_REVEALED_SCALE) + f(Setting.ORDER_POP_AMOUNT) * pop)
-                circle(c, fg.x, fg.y, r, fg.color)
+                circle(c, fg, fg.x, fg.y, r, fg.color)
                 textPaint.typeface = Typeface.DEFAULT_BOLD
-                textPaint.color = Color.WHITE
                 textPaint.textSize = r * f(Setting.ORDER_TEXT_SCALE)
-                val baseline = fg.y - (textPaint.ascent() + textPaint.descent()) / 2f
-                c.drawText((k + 1).toString(), fg.x, baseline, textPaint)
+                textPaint.color = Color.WHITE
+                // Vertically center text
+                val textY = fg.y - (textPaint.descent() + textPaint.ascent()) / 2f
+                c.drawText("${k + 1}", fg.x, textY, textPaint)
             } else {
-                circle(
-                    c, fg.x, fg.y,
-                    baseRadius * f(Setting.ORDER_PENDING_SCALE),
-                    fg.color, f(Setting.ORDER_PENDING_ALPHA)
-                )
+                val r = baseRadius * f(Setting.ORDER_PENDING_SCALE)
+                circle(c, fg, fg.x, fg.y, r, fg.color, f(Setting.ORDER_PENDING_ALPHA))
             }
         }
     }
 
     private fun drawHint(c: Canvas) {
         if (!on(Setting.HINT_ENABLED)) return
+        val text = mode.hint
         textPaint.typeface = Typeface.DEFAULT
+        textPaint.textSize = f(Setting.HINT_SIZE) * density
         textPaint.color = Color.WHITE
         textPaint.alpha = (f(Setting.HINT_OPACITY) * 255).toInt()
-        textPaint.textSize = f(Setting.HINT_SIZE) * density
-        val lines = mode.hint.split("\n")
-        val lineHeight = textPaint.fontSpacing
-        var y = height / 2f - lineHeight * (lines.size - 1) / 2f -
-                (textPaint.ascent() + textPaint.descent()) / 2f
-        for (line in lines) {
-            c.drawText(line, width / 2f, y, textPaint)
-            y += lineHeight
+        val lines = text.split("\n")
+        val lineH = textPaint.descent() - textPaint.ascent()
+        val startY = height / 2f - (lines.size - 1) * lineH / 2f
+        for ((i, line) in lines.withIndex()) {
+            c.drawText(line, width / 2f, startY + i * lineH, textPaint)
         }
     }
 

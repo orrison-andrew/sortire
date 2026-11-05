@@ -23,7 +23,8 @@ class MainActivity : Activity() {
 
     private lateinit var arena: ArenaView
     private lateinit var tuneButton: View
-    private lateinit var panel: SettingsPanel
+    private lateinit var rootLayout: FrameLayout
+    private var panel: SettingsPanel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,23 +33,15 @@ class MainActivity : Activity() {
 
         arena = ArenaView(this)
         tuneButton = buildTuneButton()
-        panel = SettingsPanel(
-            this,
-            onChange = { arena.onSettingChanged(it) },
-            getCurrentMode = { arena.mode },
-            onModeChange = { mode -> select(mode) },
-            onClose = { closePanel() }
-        ).apply { visibility = View.GONE }
 
-        val root = FrameLayout(this)
-        root.addView(arena, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-        root.addView(
+        rootLayout = FrameLayout(this)
+        rootLayout.addView(arena, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        rootLayout.addView(
             tuneButton,
             FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.END)
                 .apply { topMargin = dp(36); marginEnd = dp(16) }
         )
-        root.addView(panel, FrameLayout.LayoutParams(MATCH_PARENT, dp(320), Gravity.BOTTOM))
-        setContentView(root)
+        setContentView(rootLayout)
 
         if (Build.VERSION.SDK_INT >= 28) {
             window.attributes.layoutInDisplayCutoutMode =
@@ -69,20 +62,37 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (panel.visibility == View.VISIBLE) closePanel() else super.onBackPressed()
+        if (panel?.visibility == View.VISIBLE) closePanel() else super.onBackPressed()
+    }
+
+    private fun getOrCreatePanel(): SettingsPanel {
+        var p = panel
+        if (p == null) {
+            p = SettingsPanel(
+                this,
+                onChange = { arena.onSettingChanged(it) },
+                getCurrentMode = { arena.mode },
+                onModeChange = { mode -> select(mode) },
+                onClose = { closePanel() }
+            )
+            rootLayout.addView(p, FrameLayout.LayoutParams(MATCH_PARENT, dp(320), Gravity.BOTTOM))
+            panel = p
+        }
+        return p
     }
 
     private fun openPanel() {
+        val p = getOrCreatePanel()
         val h = resources.displayMetrics.heightPixels
         val landscape = resources.displayMetrics.widthPixels > h
-        (panel.layoutParams as FrameLayout.LayoutParams).height = (h * if (landscape) 0.75f else 0.55f).toInt()
-        panel.requestLayout()
-        panel.visibility = View.VISIBLE
+        (p.layoutParams as FrameLayout.LayoutParams).height = (h * if (landscape) 0.75f else 0.55f).toInt()
+        p.requestLayout()
+        p.visibility = View.VISIBLE
         tuneButton.visibility = View.GONE
     }
 
     private fun closePanel() {
-        panel.visibility = View.GONE
+        panel?.visibility = View.GONE
         tuneButton.visibility = View.VISIBLE
     }
 
