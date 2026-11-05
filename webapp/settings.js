@@ -43,6 +43,7 @@
 
     // Appearance & Themes
     { key: 'wood_type', group: 'APPEARANCE', label: 'Wood species', def: 3, min: 0, max: 5, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart'], resetsRound: true },
+    { key: 'wood_gl', group: 'APPEARANCE', label: 'GPU woodgrain (fast, experimental)', def: 1, isBool: true, resetsRound: true },
     { key: 'radius', group: 'APPEARANCE', label: 'Circle radius', def: 60, min: 20, max: 120, step: 2, unit: 'dp' },
     { key: 'pulse_amount', group: 'APPEARANCE', label: 'Pulse amount', def: 0, min: 0, max: 0.3, step: 0.01 },
     { key: 'pulse_speed', group: 'APPEARANCE', label: 'Pulse speed', def: 0, min: 0, max: 20, step: 0.5 },

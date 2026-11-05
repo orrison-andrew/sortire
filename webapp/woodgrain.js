@@ -84,7 +84,7 @@
    * @param {boolean} isMuted  Darken slightly for the winner-background overlay
    * @returns {HTMLCanvasElement}
    */
-  function generate(name, size, seed, isMuted) {
+  function generateCPU(name, size, seed, isMuted) {
     size = size || 1024;
     seed = seed || 1;
     var sp = SPECIES[name] || SPECIES.walnut;
@@ -165,6 +165,33 @@
     c.getContext('2d').putImageData(img, 0, 0);
     return c;
   }
+
+  // ── Generator switch ──────────────────────────────────────────────────────
+  // 'gl'  : WebGL fragment-shader generator from woodgrain-gl.js (milliseconds).
+  // 'cpu' : the original per-pixel JavaScript generator above (seconds at 2048 px).
+  // 'gl' silently falls back to 'cpu' if woodgrain-gl.js is missing or WebGL fails.
+  var engine = 'gl';
+
+  function generate(name, size, seed, isMuted) {
+    if (engine === 'gl' && root.WoodGrainGL) {
+      var c = root.WoodGrainGL.generate(name, size, seed, isMuted);
+      if (c) return c;
+    }
+    return generateCPU(name, size, seed, isMuted);
+  }
+
+  function setEngine(e) {
+    e = (e === 'cpu') ? 'cpu' : 'gl';
+    if (e === engine) return;
+    engine = e;
+    // Textures from the other generator must not be reused
+    var k;
+    for (k in bgTexCache) { bgTexCache[k].width = bgTexCache[k].height = 0; }
+    bgTexCache = {}; bgTexOrder = [];
+    discTexCache = {}; discCache = {};
+  }
+
+  function getEngine() { return engine; }
 
   // ── Disc Texture Cache (1024 px, one shared atlas per species) ────────────
   // All discs of the same species crop from this ONE shared texture.
@@ -497,6 +524,8 @@
     SPECIES_KEYS:     SPECIES_KEYS,
     mulberry32:       mulberry32,
     generate:         generate,
+    setEngine:        setEngine,
+    getEngine:        getEngine,
     getMasterTexture: getMasterTexture,
     getDiscCanvas:    getDiscCanvas,
     getDiscOverlay:   getDiscOverlay,

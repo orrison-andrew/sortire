@@ -193,9 +193,14 @@
   }
 
   // --- Colours-mode background brightness ---
-  // The background shows the previous winner's colour at full strength while fingers
+  // The background shows a dimmed version of the previous winner's colour while fingers
   // are on the screen, and darkens to the dark resting version once they are removed.
-  var bgMix = 0;          // 0 = dark resting background, 1 = previous winner's colour
+  // (Right after a win it is still the full flood colour and eases down to the dim level.)
+  // How strongly the previous winner's colour shows while fingers are down
+  // (0 = fully dark resting background, 1 = full winner colour). Lower = dimmer.
+  var BG_DIM_LEVEL = 0.35;
+
+  var bgMix = 0;          // current level: 0 = dark resting background, 1 = full winner colour
   var bgMixTime = 0;
   var floodBase = null;   // background the winner colour floods over
 
@@ -208,7 +213,10 @@
   }
 
   function bgMixTarget() {
-    return fingerIds.length > 0 ? 1 : 0;
+    // The flood holds the full winner colour while the result is showing
+    var w = fingers[winnerId];
+    if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && w) return 1;
+    return fingerIds.length > 0 ? BG_DIM_LEVEL : 0;
   }
 
   function updateBgMix(now) {
@@ -271,7 +279,7 @@
         // colour becomes the background for the next round.
         floodBase = currentBackgroundColor();
         lastWinnerColor = w.color;
-        bgMix = 1;
+        if (Settings.bool('winner_flood')) bgMix = 1;   // flood ends on the full colour; next round eases down to BG_DIM_LEVEL
         lastWinnerWood  = w.discSpecies;
       }
       var bgWinnerEl = document.getElementById('wood-bg-winner');
@@ -905,6 +913,7 @@
 
   // --- App Initialization ---
   function init() {
+    WoodGrain.setEngine(Settings.bool('wood_gl') ? 'gl' : 'cpu');
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
@@ -1023,7 +1032,10 @@
     updateTabletopBackground();
 
     Settings.addChangeListener(function (s) {
-      if (!s || s.key === 'wood_type' || s.key === 'woodgrain_enabled' || s.key === 'winner_bg_enabled') {
+      if (!s || s.key === 'wood_gl') {
+        WoodGrain.setEngine(Settings.bool('wood_gl') ? 'gl' : 'cpu');
+      }
+      if (!s || s.key === 'wood_gl' || s.key === 'wood_type' || s.key === 'woodgrain_enabled' || s.key === 'winner_bg_enabled') {
         updateTabletopBackground();
       }
     });

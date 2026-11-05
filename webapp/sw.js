@@ -1,9 +1,10 @@
-const CACHE_NAME = 'sortire-pwa-v6';
+const CACHE_NAME = 'sortire-pwa-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './woodgrain.js',
+  './woodgrain-gl.js',
   './sound.js',
   './settings.js',
   './app.js',
