@@ -35,6 +35,7 @@ html, body {
 #wood-bg-winner {
   opacity: 0;
   z-index: 0;
+  transition: none;   /* app.js drives the reveal with clip-path */
 }
 
 #wood-bg svg, #wood-bg-winner svg {

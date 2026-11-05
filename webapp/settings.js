@@ -18,9 +18,9 @@
   var SETTINGS_SCHEMA = [
     // Winner Options
     { key: 'winner_flood', group: 'WINNER', label: 'Winner floods the screen', def: 1, isBool: true },
-    { key: 'marker_enabled', group: 'WINNER', label: 'Show winner marker ring', def: 1, isBool: true },
+    { key: 'marker_enabled', group: 'WINNER', label: 'Show winner marker ring', def: 0, isBool: true },
     { key: 'winner_fade_ms', group: 'WINNER', label: 'Losers fade-out time', def: 300, min: 0, max: 1500, step: 50, unit: 'ms' },
-    { key: 'winner_grow_ms', group: 'WINNER', label: 'Winner grow time', def: 600, min: 0, max: 2000, step: 50, unit: 'ms' },
+    { key: 'winner_grow_ms', group: 'WINNER', label: 'Winner grow time', def: 1100, min: 0, max: 2000, step: 50, unit: 'ms' },
     { key: 'marker_radius', group: 'WINNER', label: 'Marker ring size', def: 1.3, min: 1, max: 2, step: 0.05, unit: '×' },
     { key: 'marker_stroke', group: 'WINNER', label: 'Marker ring thickness', def: 8, min: 0, max: 20, step: 1, unit: 'dp' },
     { key: 'marker_dot', group: 'WINNER', label: 'Marker center dot size', def: 0.45, min: 0, max: 1, step: 0.05, unit: '×' },
@@ -32,24 +32,24 @@
     // Color Controls
     { key: 'winner_bg_enabled', group: 'COLORS', label: 'Background from last winner', def: 1, isBool: true, resetsRound: false },
     { key: 'woodgrain_enabled', group: 'COLORS', label: 'Enable woodgrain style', def: 1, isBool: true, resetsRound: true },
-    { key: 'random_hue', group: 'COLORS', label: 'Random base hue each round', def: 0, isBool: true, resetsRound: true },
-    { key: 'base_hue', group: 'COLORS', label: 'Base hue', def: 260, min: 0, max: 360, step: 5, unit: '°', resetsRound: true },
+    { key: 'random_hue', group: 'COLORS', label: 'Random background hue each round', def: 0, isBool: true, resetsRound: true },
+    { key: 'base_hue', group: 'COLORS', label: 'Background hue', def: 260, min: 0, max: 360, step: 5, unit: '°', resetsRound: true },
     { key: 'bg_saturation', group: 'COLORS', label: 'Background saturation', def: 0.45, min: 0, max: 1, step: 0.02, resetsRound: true },
     { key: 'bg_value', group: 'COLORS', label: 'Background brightness', def: 0.14, min: 0, max: 1, step: 0.02, resetsRound: true },
     { key: 'saturation', group: 'COLORS', label: 'Circle saturation', def: 0.78, min: 0, max: 1, step: 0.02, resetsRound: true },
     { key: 'hue_step', group: 'COLORS', label: 'Hue step between fingers', def: 137.5, min: 0, max: 360, step: 0.5, unit: '°', resetsRound: true },
-    { key: 'value_even', group: 'COLORS', label: 'Brightness (1st, 3rd… finger)', def: 0.95, min: 0, max: 1, step: 0.02, resetsRound: true },
-    { key: 'value_odd', group: 'COLORS', label: 'Brightness (2nd, 4th… finger)', def: 0.85, min: 0, max: 1, step: 0.02, resetsRound: true },
+    { key: 'value_even', group: 'COLORS', label: 'Brightness (1st, 3rd… finger)', def: 1, min: 0, max: 1, step: 0.02, resetsRound: true },
+    { key: 'value_odd', group: 'COLORS', label: 'Brightness (2nd, 4th… finger)', def: 1, min: 0, max: 1, step: 0.02, resetsRound: true },
 
     // Appearance & Themes
     { key: 'wood_type', group: 'APPEARANCE', label: 'Wood species', def: 3, min: 0, max: 5, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart'], resetsRound: true },
     { key: 'radius', group: 'APPEARANCE', label: 'Circle radius', def: 60, min: 20, max: 120, step: 2, unit: 'dp' },
-    { key: 'pulse_amount', group: 'APPEARANCE', label: 'Pulse amount', def: 0.06, min: 0, max: 0.3, step: 0.01 },
-    { key: 'pulse_speed', group: 'APPEARANCE', label: 'Pulse speed', def: 3.5, min: 0, max: 20, step: 0.5 },
+    { key: 'pulse_amount', group: 'APPEARANCE', label: 'Pulse amount', def: 0, min: 0, max: 0.3, step: 0.01 },
+    { key: 'pulse_speed', group: 'APPEARANCE', label: 'Pulse speed', def: 0, min: 0, max: 20, step: 0.5 },
 
     // Countdown Ring & Timing
     { key: 'countdown_ms', group: 'TIMING', label: 'Countdown before choosing', def: 2000, min: 500, max: 6000, step: 100, unit: 'ms' },
-    { key: 'min_fingers', group: 'TIMING', label: 'Minimum fingers', def: 2, min: 1, max: 5, step: 1, unit: '', resetsRound: true },
+    { key: 'min_fingers', group: 'TIMING', label: 'Minimum fingers', def: 1, min: 1, max: 5, step: 1, unit: '', resetsRound: true },
     { key: 'reveal_gap_ms', group: 'TIMING', label: 'Order: gap between numbers', def: 450, min: 100, max: 1500, step: 50, unit: 'ms' },
     { key: 'ring_enabled', group: 'TIMING', label: 'Show countdown ring', def: 1, isBool: true },
     { key: 'ring_offset', group: 'TIMING', label: 'Ring distance from circle', def: 14, min: 0, max: 40, step: 1, unit: 'dp' },
@@ -73,10 +73,112 @@
     { key: 'hint_opacity', group: 'SYSTEM', label: 'Hint text opacity', def: 0.7, min: 0, max: 1, step: 0.05 }
   ];
 
+  // Two complete base configurations. Toggling "Enable woodgrain style" switches
+  // between them (see applyPreset). The schema defaults above equal PRESETS.woodgrain.
+  var PRESETS = {
+    woodgrain: {
+      winner_flood: 1,
+      marker_enabled: 0,
+      winner_fade_ms: 300,
+      winner_grow_ms: 1100,
+      marker_radius: 1.3,
+      marker_stroke: 8,
+      marker_dot: 0.45,
+      sound_enabled: 1,
+      sound_style: 0,
+      winner_bg_enabled: 1,
+      woodgrain_enabled: 1,
+      random_hue: 0,
+      base_hue: 260,
+      bg_saturation: 0.45,
+      bg_value: 0.14,
+      saturation: 0.78,
+      hue_step: 137.5,
+      value_even: 1,
+      value_odd: 1,
+      wood_type: 3,
+      radius: 60,
+      pulse_amount: 0,
+      pulse_speed: 0,
+      countdown_ms: 2000,
+      min_fingers: 1,
+      reveal_gap_ms: 450,
+      ring_enabled: 1,
+      ring_offset: 14,
+      ring_stroke: 6,
+      ring_opacity: 0.9,
+      order_revealed_scale: 1.1,
+      order_pop_amount: 0.3,
+      order_pop_ms: 250,
+      order_pending_scale: 0.8,
+      order_pending_alpha: 0.35,
+      order_text_scale: 0.95,
+      haptic_tap: 1,
+      haptic_tick: 1,
+      haptic_result: 1,
+      hint_enabled: 1,
+      hint_size: 22,
+      hint_opacity: 0.7
+    },
+    colors: {
+      winner_flood: 1,
+      marker_enabled: 1,
+      winner_fade_ms: 300,
+      winner_grow_ms: 1100,
+      marker_radius: 1.3,
+      marker_stroke: 8,
+      marker_dot: 0.45,
+      sound_enabled: 1,
+      sound_style: 0,
+      winner_bg_enabled: 1,
+      woodgrain_enabled: 0,
+      random_hue: 0,
+      base_hue: 260,
+      bg_saturation: 0.45,
+      bg_value: 0.14,
+      saturation: 0.78,
+      hue_step: 137.5,
+      value_even: 1,
+      value_odd: 1,
+      wood_type: 3,
+      radius: 60,
+      pulse_amount: 0.11,
+      pulse_speed: 3.5,
+      countdown_ms: 2000,
+      min_fingers: 1,
+      reveal_gap_ms: 450,
+      ring_enabled: 1,
+      ring_offset: 14,
+      ring_stroke: 6,
+      ring_opacity: 0.9,
+      order_revealed_scale: 1.1,
+      order_pop_amount: 0.3,
+      order_pop_ms: 250,
+      order_pending_scale: 0.8,
+      order_pending_alpha: 0.35,
+      order_text_scale: 0.95,
+      haptic_tap: 1,
+      haptic_tick: 1,
+      haptic_result: 1,
+      hint_enabled: 1,
+      hint_size: 22,
+      hint_opacity: 0.7
+    }
+  };
+
+  // Bump when defaults change so devices with older saved values pick up the new ones once.
+  var SETTINGS_VERSION = '2';
+
   var values = {};
   var listeners = [];
 
   function init() {
+    try {
+      if (localStorage.getItem('sortire_settings_version') !== SETTINGS_VERSION) {
+        SETTINGS_SCHEMA.forEach(function (s) { localStorage.removeItem('sortire_' + s.key); });
+        localStorage.setItem('sortire_settings_version', SETTINGS_VERSION);
+      }
+    } catch (e) {}
     SETTINGS_SCHEMA.forEach(function (s) {
       var saved = localStorage.getItem('sortire_' + s.key);
       if (saved !== null) {
@@ -111,6 +213,18 @@
     SETTINGS_SCHEMA.forEach(function (s) {
       values[s.key] = s.def;
       localStorage.removeItem('sortire_' + s.key);
+    });
+    listeners.forEach(function (fn) { fn(null); });
+  }
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) return;
+    SETTINGS_SCHEMA.forEach(function (s) {
+      if (p[s.key] !== undefined) {
+        values[s.key] = p[s.key];
+        localStorage.setItem('sortire_' + s.key, String(p[s.key]));
+      }
     });
     listeners.forEach(function (fn) { fn(null); });
   }
@@ -178,6 +292,8 @@
     bool: bool,
     set: set,
     resetAll: resetAll,
+    PRESETS: PRESETS,
+    applyPreset: applyPreset,
     format: format,
     dump: dump,
     dumpJson: dumpJson,

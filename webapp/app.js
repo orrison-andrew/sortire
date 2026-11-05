@@ -89,9 +89,8 @@
   }
 
   // --- Palette Class & Session Winner Tracking ---
-  var lastWinnerSpecies = null;
-  var lastWinnerSeed    = null;
-  var lastWinnerColor   = null;
+  var lastWinnerColor   = null;   // palette colour (used by the colours-mode background)
+  var lastWinnerWood    = null;   // species key of the winning disc (the wood background is recoloured to it)
 
   // Per-session background seed — randomised on first load and whenever the
   // species background changes so the grain pattern never looks identical.
@@ -103,20 +102,19 @@
     this.valueEven = Settings.get('value_even');
     this.valueOdd = Settings.get('value_odd');
 
+    // Finger colours: the starting hue is random every round, so the first finger
+    // is never the same colour as last time (or as the last winner).
+    this.baseHue = Math.random() * 360;
+
+    // Background colour (used when woodgrain is off)
     if (Settings.bool('winner_bg_enabled') && lastWinnerColor) {
-      // Background derived from slightly muted version of last winning color
+      // Derived from a slightly muted version of the last winning colour
       var hsv = rgbToHsv(lastWinnerColor.r, lastWinnerColor.g, lastWinnerColor.b);
-      this.baseHue = hsv.h;
       var mutedSat = Math.min(Settings.get('bg_saturation'), hsv.s * 0.65);
-      var mutedVal = Settings.get('bg_value');
-      this.background = hsvToRgb(hsv.h, mutedSat, mutedVal);
+      this.background = hsvToRgb(hsv.h, mutedSat, Settings.get('bg_value'));
     } else {
-      this.baseHue = Settings.bool('random_hue') ? Math.random() * 360 : Settings.get('base_hue');
-      this.background = hsvToRgb(
-        this.baseHue % 360,
-        Settings.get('bg_saturation'),
-        Settings.get('bg_value')
-      );
+      var bgHue = Settings.bool('random_hue') ? Math.random() * 360 : Settings.get('base_hue');
+      this.background = hsvToRgb(bgHue % 360, Settings.get('bg_saturation'), Settings.get('bg_value'));
     }
   }
 
@@ -187,14 +185,56 @@
     var woodOn = Settings.bool('woodgrain_enabled');
     if (!woodOn) return;   // canvas draw() handles the colour fill instead
 
-    // winner_bg_enabled ON + a previous winner exists → use their species (muted)
-    // winner_bg_enabled OFF (or no previous winner)   → use the chosen species + fresh seed
-    if (Settings.bool('winner_bg_enabled') && lastWinnerSpecies) {
-      // Same species + seed the winner flood used, so the grain carries over
-      WoodGrain.renderBackground(bgEl, lastWinnerSpecies, lastWinnerSeed, /*isMuted=*/true);
-    } else {
-      WoodGrain.renderBackground(bgEl, getBaseWoodTypeKey(), bgSeed, /*isMuted=*/false);
-    }
+    // The grain (species texture + seed) stays the same between rounds. With
+    // winner_bg_enabled ON it is recoloured to the previous winner's wood, which is
+    // exactly what the winner flood ended on, so there is no visible jump.
+    var recolorTo = (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
+    WoodGrain.renderBackground(bgEl, getBaseWoodTypeKey(), bgSeed, /*isMuted=*/false, recolorTo);
+  }
+
+  // --- Colours-mode background brightness ---
+  // The background shows the previous winner's colour at full strength while fingers
+  // are on the screen, and darkens to the dark resting version once they are removed.
+  var bgMix = 0;          // 0 = dark resting background, 1 = previous winner's colour
+  var bgMixTime = 0;
+  var floodBase = null;   // background the winner colour floods over
+
+  function brightBackground() {
+    return (Settings.bool('winner_bg_enabled') && lastWinnerColor) ? lastWinnerColor : palette.background;
+  }
+
+  function currentBackgroundColor() {
+    return blendColors(palette.background, brightBackground(), bgMix);
+  }
+
+  function bgMixTarget() {
+    return fingerIds.length > 0 ? 1 : 0;
+  }
+
+  function updateBgMix(now) {
+    var dt = bgMixTime ? Math.min(100, now - bgMixTime) : 16;
+    bgMixTime = now;
+    var target = bgMixTarget();
+    var tau = target > bgMix ? 150 : 450;     // brighten quickly, darken gently
+    bgMix += (target - bgMix) * (1 - Math.exp(-dt / tau));
+    if (Math.abs(target - bgMix) < 0.004) bgMix = target;
+  }
+
+  // --- Winner flood layer (woodgrain): wood grows out of the winning disc ---
+  var floodState = '';
+
+  // Show the flood as a circle of radius R centred on (x, y), or hide it with null.
+  function setFlood(circle) {
+    var el = document.getElementById('wood-bg-winner');
+    if (!el) return;
+    var state = circle
+      ? 'circle(' + circle.r.toFixed(1) + 'px at ' + circle.x.toFixed(1) + 'px ' + circle.y.toFixed(1) + 'px)'
+      : '';
+    if (state === floodState) return;
+    floodState = state;
+    el.style.opacity = circle ? '1' : '0';
+    el.style.clipPath = state;
+    el.style.webkitClipPath = state;
   }
 
   function reset() {
@@ -207,13 +247,12 @@
     phase = 'WAITING';
     palette = new Palette();
 
-    // Fresh grain pattern each round (new seed → different pith position / ring phase)
-    bgSeed = Math.floor(Math.random() * 100000) + 1;
+    // Same grain every round while tinting from the last winner; otherwise a fresh
+    // grain pattern each round (new seed → different pith position / ring phase)
+    if (!Settings.bool('winner_bg_enabled')) bgSeed = Math.floor(Math.random() * 100000) + 1;
 
-    var bgWinnerEl = document.getElementById('wood-bg-winner');
-    if (bgWinnerEl) bgWinnerEl.style.opacity = '0';
-
-    updateTabletopBackground();
+    updateTabletopBackground();   // before hiding the flood, so there is no flash
+    setFlood(null);
     requestDraw();
   }
   function resolve(now) {
@@ -228,14 +267,17 @@
 
       var w = fingers[winnerId];
       if (w) {
-        // Remember the winner so the next round's background can match it
-        lastWinnerSpecies = w.discSpecies;
-        lastWinnerSeed    = w.seed;
-        lastWinnerColor   = w.color;
+        // The flood spreads over whatever background was showing, then the winner's
+        // colour becomes the background for the next round.
+        floodBase = currentBackgroundColor();
+        lastWinnerColor = w.color;
+        bgMix = 1;
+        lastWinnerWood  = w.discSpecies;
       }
       var bgWinnerEl = document.getElementById('wood-bg-winner');
       if (w && bgWinnerEl && Settings.bool('woodgrain_enabled')) {
-        WoodGrain.renderBackground(bgWinnerEl, w.discSpecies, w.seed);
+        // Same grain as the table, recoloured to the winning disc's wood
+        WoodGrain.renderBackground(bgWinnerEl, getBaseWoodTypeKey(), bgSeed, false, lastWinnerWood);
       }
 
       SoundManager.playWinner();
@@ -599,6 +641,8 @@
       advanceReveal(now);
     }
 
+    updateBgMix(now);
+
     ctx.save();
     ctx.scale(dpr, dpr);
     var w = window.innerWidth;
@@ -620,9 +664,17 @@
         var e = (now - resultStart) / 1000;
         var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
         var grow = 1 - Math.pow(1 - t, 3);
-        if (bgWinnerEl) bgWinnerEl.style.opacity = grow.toFixed(3);
+        // Wood spreads outward from the winning disc until it covers the screen
+        var discR = Settings.get('radius') * (1 + 0.3 * grow);
+        var far = Math.max(
+          Math.hypot(winnerFg.x, winnerFg.y),
+          Math.hypot(w - winnerFg.x, winnerFg.y),
+          Math.hypot(winnerFg.x, h - winnerFg.y),
+          Math.hypot(w - winnerFg.x, h - winnerFg.y)
+        ) + 2;
+        setFlood({ x: winnerFg.x, y: winnerFg.y, r: discR + (far - discR) * grow });
       } else {
-        if (bgWinnerEl) bgWinnerEl.style.opacity = '0';
+        setFlood(null);
       }
     } else {
       if (bgEl && bgEl.style.display !== 'none') bgEl.style.display = 'none';
@@ -633,11 +685,22 @@
         var e = (now - resultStart) / 1000;
         var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
         var grow = 1 - Math.pow(1 - t, 3);
-        var blended = blendColors(palette.background, winnerFg.color, grow);
-        ctx.fillStyle = rgbString(blended);
+        // Winner colour spreads outward from the winning disc over the background
+        ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
+        var discR2 = Settings.get('radius') * (1 + 0.3 * grow);
+        var far2 = Math.max(
+          Math.hypot(winnerFg.x, winnerFg.y),
+          Math.hypot(w - winnerFg.x, winnerFg.y),
+          Math.hypot(winnerFg.x, h - winnerFg.y),
+          Math.hypot(w - winnerFg.x, h - winnerFg.y)
+        ) + 2;
+        ctx.fillStyle = rgbString(winnerFg.color);
+        ctx.beginPath();
+        ctx.arc(winnerFg.x, winnerFg.y, discR2 + (far2 - discR2) * grow, 0, Math.PI * 2);
+        ctx.fill();
       } else {
-        ctx.fillStyle = rgbString(palette.background);
+        ctx.fillStyle = rgbString(currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
       }
     }
@@ -655,7 +718,7 @@
 
     ctx.restore();
 
-    var needsFrame = (fingerIds.length > 0) || (phase === 'RESULT' && now < animationEnd);
+    var needsFrame = (fingerIds.length > 0) || (phase === 'RESULT' && now < animationEnd) || (bgMix !== bgMixTarget());
     if (needsFrame) {
       animFrameId = requestAnimationFrame(render);
     }
@@ -773,6 +836,13 @@
           toggle.appendChild(cb);
           toggle.appendChild(slider);
           cb.addEventListener('change', function () {
+            if (s.key === 'woodgrain_enabled') {
+              // Woodgrain and Colors each have their own base settings
+              Settings.applyPreset(cb.checked ? 'woodgrain' : 'colors');
+              buildTuningPanel();
+              reset();
+              return;
+            }
             Settings.set(s.key, cb.checked ? 1 : 0);
             if (s.resetsRound) reset(); else requestDraw();
           });

@@ -10,6 +10,7 @@
  *   WoodGrain.generate(species, size, seed, isMuted)  → <canvas>
  *   WoodGrain.getMasterTexture(species, seed, muted)   → 2048 px <canvas> (bg use)
  *   WoodGrain.getDiscCanvas(diameter, species, seed, shadeShift) → <canvas>
+ *   WoodGrain.getDiscOverlay(diameter) → <canvas> (shading only, transparent)
  *   WoodGrain.renderBackground(el, species, seed, isMuted)
  *   WoodGrain.getSpeciesKey(index)
  *   WoodGrain.getRandomSpecies()
@@ -219,6 +220,67 @@
     return bgTexCache[key];
   }
 
+  // ── Disc shading layer (edge darkening, highlight, rim, bevel) ────────────
+  // Shared by getDiscCanvas (drawn over the wood face) and getDiscOverlay (drawn
+  // over an arbitrary face, e.g. the winner's window into the flood texture).
+  function drawShading(ctx, r, diameter) {
+    var TAU = Math.PI * 2;
+    // Edge shading (radial darkening toward rim — 3-D depth cue) ────
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, TAU);
+    ctx.clip();
+    var edgeGrad = ctx.createRadialGradient(r, r, r * 0.55, r, r, r);
+    edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    edgeGrad.addColorStop(1, 'rgba(0,0,0,0.38)');
+    ctx.fillStyle = edgeGrad;
+    ctx.fillRect(0, 0, diameter, diameter);
+    ctx.restore();
+
+    // Specular highlight (top-left lit, bottom-right shadowed) ───────
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, TAU);
+    ctx.clip();
+    var specGrad = ctx.createLinearGradient(0, 0, diameter, diameter);
+    specGrad.addColorStop(0,   'rgba(255,255,255,0.22)');
+    specGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+    specGrad.addColorStop(1,   'rgba(0,0,0,0.18)');
+    ctx.fillStyle = specGrad;
+    ctx.fillRect(0, 0, diameter, diameter);
+    ctx.restore();
+
+    // Rim stroke ─────────────────────────────────────────────────────
+    ctx.lineWidth   = r * 0.05;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
+    ctx.stroke();
+
+    // Bevel highlight ────────────────────────────────────────────────
+    ctx.lineWidth   = r * 0.03;
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.arc(r, r, r * 0.93, 0, TAU);
+    ctx.stroke();
+  }
+
+  var overlayCache = {};
+
+  /**
+   * Transparent canvas holding only the disc shading (no wood face, no shadow).
+   * Used to put the same 3-D look on top of a face drawn from another texture.
+   */
+  function getDiscOverlay(diameter) {
+    diameter = Math.max(32, diameter | 0);
+    if (overlayCache[diameter]) return overlayCache[diameter];
+    var c = document.createElement('canvas');
+    c.width = c.height = diameter;
+    drawShading(c.getContext('2d'), diameter / 2, diameter);
+    overlayCache[diameter] = c;
+    return c;
+  }
+
   // ── Disc Renderer ──────────────────────────────────────────────────────────
   var discCache = {};
 
@@ -287,47 +349,40 @@
       ctx.restore();
     }
 
-    // ── 3. Edge shading (radial darkening toward rim — 3-D depth cue) ────
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
-    ctx.clip();
-    var edgeGrad = ctx.createRadialGradient(r, r, r * 0.55, r, r, r);
-    edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    edgeGrad.addColorStop(1, 'rgba(0,0,0,0.38)');
-    ctx.fillStyle = edgeGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
-    ctx.restore();
-
-    // ── 4. Specular highlight (top-left lit, bottom-right shadowed) ───────
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
-    ctx.clip();
-    var specGrad = ctx.createLinearGradient(0, 0, diameter, diameter);
-    specGrad.addColorStop(0,   'rgba(255,255,255,0.22)');
-    specGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
-    specGrad.addColorStop(1,   'rgba(0,0,0,0.18)');
-    ctx.fillStyle = specGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
-    ctx.restore();
-
-    // ── 5. Rim stroke ─────────────────────────────────────────────────────
-    ctx.lineWidth   = r * 0.05;
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
-    ctx.stroke();
-
-    // ── 6. Bevel highlight ────────────────────────────────────────────────
-    ctx.lineWidth   = r * 0.03;
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.beginPath();
-    ctx.arc(r, r, r * 0.93, 0, TAU);
-    ctx.stroke();
+    // ── 3. Edge shading, specular highlight, rim and bevel ────────────────
+    drawShading(ctx, r, diameter);
 
     discCache[cacheKey] = c;
     return c;
+  }
+
+  // ── Species recolour ──────────────────────────────────────────────────────
+  // Every texture pixel lies (roughly) on the line from the species' earlywood colour
+  // to its latewood colour. Project each pixel onto that line to get its position m
+  // (0 = light, 1 = dark), then re-colour it along the TARGET species' line. Grain is
+  // preserved; colour and brightness become the target wood's. The pixel's broad tonal
+  // variation (brightness relative to the line) is kept via the k ratio.
+  function recolor(ctx, pw, ph, fromKey, toKey) {
+    var A = SPECIES[fromKey] || SPECIES.walnut, B = SPECIES[toKey];
+    if (!B || A === B) return;
+    var img = ctx.getImageData(0, 0, pw, ph), D = img.data;
+    var Lr = A.light[0], Lg = A.light[1], Lb = A.light[2];
+    var dr = A.dark[0] - Lr, dg = A.dark[1] - Lg, db = A.dark[2] - Lb;
+    var denom = (dr * dr + dg * dg + db * db) || 1;
+    var Br = B.light[0], Bg = B.light[1], Bb = B.light[2];
+    var er = B.dark[0] - Br, eg = B.dark[1] - Bg, eb = B.dark[2] - Bb;
+    for (var i = 0; i < D.length; i += 4) {
+      var r = D[i], g = D[i + 1], b = D[i + 2];
+      var m = ((r - Lr) * dr + (g - Lg) * dg + (b - Lb) * db) / denom;
+      m = m < 0 ? 0 : m > 1 ? 1 : m;
+      var ta = (Lr + dr * m) + (Lg + dg * m) + (Lb + db * m);
+      var k = ta > 0 ? (r + g + b) / ta : 1;
+      k = k < 0.8 ? 0.8 : k > 1.25 ? 1.25 : k;
+      D[i]     = (Br + er * m) * k;   // Uint8ClampedArray clamps automatically
+      D[i + 1] = (Bg + eg * m) * k;
+      D[i + 2] = (Bb + eb * m) * k;
+    }
+    ctx.putImageData(img, 0, 0);
   }
 
   // ── Background Renderer ───────────────────────────────────────────────────
@@ -345,8 +400,9 @@
    * @param {string}  speciesKey
    * @param {number}  seed
    * @param {boolean} isMuted
+   * @param {string} [recolorTo]  Species key to recolour the wood to, keeping the grain
    */
-  function renderBackground(container, speciesKey, seed, isMuted) {
+  function renderBackground(container, speciesKey, seed, isMuted, recolorTo) {
     if (!container) return;
     speciesKey = speciesKey || 'walnut';
     seed = (seed || 42) | 0;
@@ -400,6 +456,10 @@
       ctx.restore();
     }
 
+    // Recolour to another species (keeps this texture's grain, takes the target's
+    // colour AND brightness).
+    if (recolorTo && recolorTo !== speciesKey) recolor(ctx, pw, ph, speciesKey, recolorTo);
+
     // ── Vignette: subtle radial darkening toward the edges (table-depth cue) ─
     var vig = ctx.createRadialGradient(
       pw / 2, ph / 2, Math.min(pw, ph) * 0.3,
@@ -417,6 +477,16 @@
     return SPECIES_KEYS[index];
   }
 
+  // Base colour of a species: midpoint of its earlywood and latewood colours.
+  function getBaseColor(name) {
+    var sp = SPECIES[name] || SPECIES.walnut;
+    return {
+      r: Math.round((sp.light[0] + sp.dark[0]) / 2),
+      g: Math.round((sp.light[1] + sp.dark[1]) / 2),
+      b: Math.round((sp.light[2] + sp.dark[2]) / 2)
+    };
+  }
+
   function getRandomSpecies() {
     return SPECIES_KEYS[Math.floor(Math.random() * SPECIES_KEYS.length)];
   }
@@ -429,8 +499,10 @@
     generate:         generate,
     getMasterTexture: getMasterTexture,
     getDiscCanvas:    getDiscCanvas,
+    getDiscOverlay:   getDiscOverlay,
     renderBackground: renderBackground,
     getSpeciesKey:    getSpeciesKey,
+    getBaseColor:     getBaseColor,
     getRandomSpecies: getRandomSpecies
   };
 
