@@ -1,20 +1,17 @@
 /*
- * woodgrain.js: Procedural pixel-based woodgrain renderer for Sortire PWA.
- * Uses seeded PRNG + FBM value-noise — the same proven algorithm as woodgrain-new.js,
- * now with two texture tiers to stay crisp at 3× DPR (460 PPI devices):
+ * woodgrain.js: GPU woodgrain for Sortire (WebGL, no CPU fallback generator).
  *
- *   • Disc textures  — 1024 × 1024, one shared atlas per species (fast, re-used)
- *   • BG textures    — 2048 × 2048, per species+seed (generated once, cached)
+ *   WoodGrain.SPECIES / SPECIES_KEYS
+ *   WoodGrain.generate(species, size, seed)            -> <canvas>  (GPU-rendered texture)
+ *   WoodGrain.getDiscCanvas(diameter, species, seed, shade) -> <canvas> (shaded puck)
+ *   WoodGrain.createBackground(container)              -> live table layer
+ *       .draw({ species, seed, table, flood, time, tiltX, tiltY, sheen, vignette })
+ *   WoodGrain.createEffects(canvas)                    -> winner effects layer
+ *       .trigger(x, y, opts) / .draw(now) / .stop() / .isActive()
+ *   WoodGrain.getSpeciesKey(i) / getRandomSpecies() / getBaseColor(species)
  *
- * API:
- *   WoodGrain.generate(species, size, seed, isMuted)  → <canvas>
- *   WoodGrain.getMasterTexture(species, seed, muted)   → 2048 px <canvas> (bg use)
- *   WoodGrain.getDiscCanvas(diameter, species, seed, shadeShift) → <canvas>
- *   WoodGrain.getDiscOverlay(diameter) → <canvas> (shading only, transparent)
- *   WoodGrain.renderBackground(el, species, seed, isMuted)
- *   WoodGrain.getSpeciesKey(index)
- *   WoodGrain.getRandomSpecies()
- *   WoodGrain.SPECIES / WoodGrain.SPECIES_KEYS / WoodGrain.mulberry32
+ * If WebGL (or high-precision float) is unavailable, textures fall back to a flat
+ * light-to-dark gradient and the live layers switch themselves off.
  */
 (function (root) {
   'use strict';
@@ -30,17 +27,20 @@
     redOak:      { label: 'Red oak',     light: [208, 152, 114], dark: [142,  84,  58], rings: 8,  tilt: 0.35, sharp: 2.6, contrast: 0.80, fiber: 0.12, pores: 0.6, rays: 0.20, warp: 0.18, tone: 0.08 },
     walnut:      { label: 'Walnut',      light: [112,  78,  56], dark: [ 46,  29,  20], rings: 7,  tilt: 0.40, sharp: 2.4, contrast: 0.85, fiber: 0.16, pores: 0.2, rays: 0,    warp: 0.25, tone: 0.10 },
     ebony:       { label: 'Ebony',       light: [ 66,  54,  45], dark: [ 13,  10,   9], rings: 5,  tilt: 0.45, sharp: 2.0, contrast: 0.45, fiber: 0.40, pores: 0,   rays: 0,    warp: 0.30, tone: 0.10 },
-    purpleheart: { label: 'Purpleheart', light: [134,  72, 122], dark: [ 60,  27,  58], rings: 5,  tilt: 0.45, sharp: 2.0, contrast: 0.45, fiber: 0.22, pores: 0,   rays: 0,    warp: 0.12, tone: 0.06 }
+    purpleheart: { label: 'Purpleheart', light: [134,  72, 122], dark: [ 60,  27,  58], rings: 5,  tilt: 0.45, sharp: 2.0, contrast: 0.45, fiber: 0.22, pores: 0,   rays: 0,    warp: 0.12, tone: 0.06 },
+    cherry:      { label: 'Cherry',      light: [196, 118,  84], dark: [140,  66,  42], rings: 8,  tilt: 0.38, sharp: 2.4, contrast: 0.55, fiber: 0.12, pores: 0,   rays: 0,    warp: 0.16, tone: 0.07 },
+    pine:        { label: 'Pine',        light: [238, 212, 160], dark: [190, 140,  80], rings: 10, tilt: 0.30, sharp: 2.0, contrast: 0.60, fiber: 0.14, pores: 0,   rays: 0,    warp: 0.22, tone: 0.06 },
+    mahogany:    { label: 'Mahogany',    light: [150,  80,  56], dark: [ 84,  38,  26], rings: 4,  tilt: 0.50, sharp: 1.8, contrast: 0.35, fiber: 0.30, pores: 0.15, rays: 0,   warp: 0.12, tone: 0.08 },
+    padauk:      { label: 'Padauk',      light: [210,  86,  40], dark: [140,  40,  22], rings: 4,  tilt: 0.45, sharp: 2.0, contrast: 0.40, fiber: 0.20, pores: 0,   rays: 0,    warp: 0.10, tone: 0.06 },
+    zebrawood:   { label: 'Zebrawood',   light: [224, 196, 150], dark: [ 58,  40,  28], rings: 16, tilt: 0.15, sharp: 3.0, contrast: 1.00, fiber: 0.08, pores: 0,   rays: 0,    warp: 0.10, tone: 0.05 },
+    yellowheart: { label: 'Yellowheart', light: [236, 214,  96], dark: [190, 160,  50], rings: 5,  tilt: 0.42, sharp: 2.0, contrast: 0.40, fiber: 0.16, pores: 0,   rays: 0,    warp: 0.12, tone: 0.05 }
   };
 
-  var SPECIES_KEYS = ['maple', 'whiteOak', 'redOak', 'walnut', 'ebony', 'purpleheart'];
+  var SPECIES_KEYS = ['maple', 'whiteOak', 'redOak', 'walnut', 'ebony', 'purpleheart',
+                      'cherry', 'pine', 'mahogany', 'padauk', 'zebrawood', 'yellowheart'];
 
-  // Texture resolution tiers:
-  //   DISC_SIZE : shared per-species atlas for disc crops (1024 is plenty for any disc ≤700 px)
-  //   BG_SIZE   : background texture; must exceed physical_px / dpr at peak DPR (3×)
-  //               2622 × 1206 physical / 3 dpr = 874 × 402 logical — 2048 tex covers it without upscale
-  var DISC_SIZE = 1024;
-  var BG_SIZE   = 2048;
+  var DISC_SIZE = 1024;   // shared per-species atlas that disc faces crop from
+  var BG_SIZE   = 2048;   // table texture
 
   // ── Seeded PRNG (mulberry32) ──────────────────────────────────────────────
   function mulberry32(seed) {
@@ -53,206 +53,300 @@
     };
   }
 
-  // ── 2D Value Noise (smooth, 0..1) ─────────────────────────────────────────
-  function makeNoise(seed) {
-    var r = mulberry32(seed), p = [], P = new Uint8Array(512), V = new Float32Array(256), i;
-    for (i = 0; i < 256; i++) { p[i] = i; V[i] = r(); }
-    for (i = 255; i > 0; i--) { var j = (r() * (i + 1)) | 0, t = p[i]; p[i] = p[j]; p[j] = t; }
-    for (i = 0; i < 512; i++) P[i] = p[i & 255];
-    return function (x, y) {
-      var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
-      var X = xi & 255, Y = yi & 255;
-      var a = V[P[P[X] + Y]], b = V[P[P[X + 1] + Y]], c = V[P[P[X] + Y + 1]], d = V[P[P[X + 1] + Y + 1]];
-      var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-    };
+  function warn(msg, e) {
+    if (typeof console !== 'undefined') console.warn('WoodGrain: ' + msg, (e && e.message) || e || '');
   }
 
-  // Fractal Brownian Motion — blends multiple octaves of noise.
-  function fbm(n, x, y, oct) {
-    var s = 0, amp = 0.5, freq = 1, tot = 0;
-    for (var i = 0; i < oct; i++) { s += amp * n(x * freq, y * freq); tot += amp; freq *= 2; amp *= 0.5; }
-    return s / tot;
+  // ═════════════════════════════════════════════════════════════════════════
+  //  WebGL helpers
+  // ═════════════════════════════════════════════════════════════════════════
+  var VERT = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
+  var QUAD = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);   // triangle strip
+
+  function getGL(canvas, attrs) {
+    var gl = null;
+    try { gl = canvas.getContext('webgl', attrs) || canvas.getContext('experimental-webgl', attrs); } catch (e) {}
+    return gl;
   }
 
-  // ── Core Texture Generator ────────────────────────────────────────────────
-  /**
-   * Renders a size×size canvas of realistic pixel woodgrain.
-   * @param {string}  name     Species key ('walnut', 'maple', …)
-   * @param {number}  size     Canvas edge in px (1024 for discs, 2048 for backgrounds)
-   * @param {number}  seed     Integer — controls pith position and ring phase
-   * @param {boolean} isMuted  Darken slightly for the winner-background overlay
-   * @returns {HTMLCanvasElement}
-   */
-  function generateCPU(name, size, seed, isMuted) {
-    size = size || 1024;
-    seed = seed || 1;
+  // The shaders need 23-bit float precision (noise lattice, projection maths).
+  // A few old Android GPUs only offer medium precision and would render garbage, so
+  // treat those as unsupported instead of showing broken output.
+  function hasHighp(gl) {
+    var f = gl.getShaderPrecisionFormat && gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+    return !!(f && f.precision >= 23);
+  }
+
+  function compile(gl, type, src) {
+    var sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      var log = gl.getShaderInfoLog(sh);
+      gl.deleteShader(sh);
+      throw new Error('shader compile failed: ' + log);
+    }
+    return sh;
+  }
+
+  function buildProgram(gl, vsSrc, fsSrc, uniforms, attribs) {
+    var prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, fsSrc));
+    (attribs || []).forEach(function (n, i) { gl.bindAttribLocation(prog, i, n); });
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error('program link failed: ' + gl.getProgramInfoLog(prog));
+    }
+    var loc = {};
+    uniforms.forEach(function (n) { loc[n] = gl.getUniformLocation(prog, n); });
+    return { prog: prog, loc: loc };
+  }
+
+  function rgb01(arr) { return [arr[0] / 255, arr[1] / 255, arr[2] / 255]; }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Texture generator (offscreen WebGL → plain 2D canvas)
+  // ═════════════════════════════════════════════════════════════════════════
+  // Rings warped by FBM noise, fine fibers, oak pores and ray flecks, broad tone drift.
+  var GEN_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    '',
+    'uniform float uSize;',
+    'uniform vec3  uLight, uDark;',
+    'uniform float uRings, uTilt, uSharp, uContrast, uFiber, uPores, uRays, uWarp, uTone;',
+    'uniform float uCx, uV0;',
+    'uniform vec2  uOffA, uOffB, uOffC;',
+    '',
+    '// Float hash (no sine, no bit ops): stable across GPUs',
+    'float hash(vec2 p) {',
+    '  vec3 p3 = fract(vec3(p.xyx) * 0.1031);',
+    '  p3 += dot(p3, p3.yzx + 33.33);',
+    '  return fract((p3.x + p3.y) * p3.z);',
+    '}',
+    '',
+    '// Smooth 2D value noise, 0..1',
+    'float vnoise(vec2 p, vec2 off) {',
+    '  p += off;',
+    '  vec2 i = floor(p);',
+    '  vec2 f = p - i;',
+    '  float a = hash(i);',
+    '  float b = hash(i + vec2(1.0, 0.0));',
+    '  float c = hash(i + vec2(0.0, 1.0));',
+    '  float d = hash(i + vec2(1.0, 1.0));',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return a + (b - a) * u.x + (c - a) * u.y + (a - b - c + d) * u.x * u.y;',
+    '}',
+    '',
+    '// Fractal Brownian motion',
+    'float fbm(vec2 p, vec2 off, int oct) {',
+    '  float s = 0.0, amp = 0.5, tot = 0.0;',
+    '  for (int i = 0; i < 3; i++) {',
+    '    if (i >= oct) break;',
+    '    s += amp * vnoise(p, off);',
+    '    tot += amp;',
+    '    p *= 2.0;',
+    '    amp *= 0.5;',
+    '  }',
+    '  return s / tot;',
+    '}',
+    '',
+    'void main() {',
+    '  vec2 uv = gl_FragCoord.xy / uSize;',
+    '  float u = uv.x;',
+    '  float v = 1.0 - uv.y;',
+    '',
+    '  // Growth rings: distance from the pith, warped by low-frequency FBM',
+    '  float d = length(vec2(u - uCx, (v - uV0) * uTilt))',
+    '          + (fbm(vec2(u * 2.5, v * 1.2), uOffA, 3) - 0.5) * uWarp;',
+    '  float tk = d * uRings;',
+    '  float k = floor(tk);',
+    '  float f = tk - k;',
+    '  // Earlywood is pale and gradual; latewood is dark and abrupt',
+    '  float w = pow(max(f, 0.0001), uSharp) * (0.75 + 0.5 * vnoise(vec2(k * 1.7 + 0.3, 7.7), uOffB));',
+    '',
+    '  // Fine fibers: squashed across the grain, stretched along it',
+    '  float fib = fbm(vec2(u * 160.0, v * 7.0), uOffB, 2) - 0.5;',
+    '  float m = 0.35 + (w - 0.4) * uContrast * 1.6 + fib * uFiber * 2.0;',
+    '  m = clamp(m, 0.0, 1.0);',
+    '',
+    '  // Broad tonal variation across the board',
+    '  float tone = 1.0 + (fbm(vec2(u * 1.6, v * 1.2), uOffC, 3) - 0.5) * uTone * 2.0;',
+    '  vec3 col = mix(uLight, uDark, m) * tone;',
+    '',
+    '  // Pores: short dark dashes in earlywood (oak)',
+    '  if (uPores > 0.0) {',
+    '    float pr = vnoise(vec2(u * 200.0, v * 14.0), uOffC);',
+    '    if (pr > 0.78) {',
+    '      col *= 1.0 - 0.55 * ((pr - 0.78) / 0.22) * uPores * (1.0 - f * 0.6);',
+    '    }',
+    '  }',
+    '  // Medullary ray flecks: short light dashes across the grain (oak)',
+    '  if (uRays > 0.0) {',
+    '    float ry = vnoise(vec2(u * 8.0, v * 110.0), uOffA);',
+    '    if (ry > 0.82) {',
+    '      col += ((ry - 0.82) / 0.18) * uRays * 40.0 / 255.0;',
+    '    }',
+    '  }',
+    '',
+    '  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);',
+    '}'
+  ].join('\n');
+
+  var GEN_UNIFORMS = ['uSize', 'uLight', 'uDark', 'uRings', 'uTilt', 'uSharp', 'uContrast',
+                      'uFiber', 'uPores', 'uRays', 'uWarp', 'uTone', 'uCx', 'uV0', 'uOffA', 'uOffB', 'uOffC'];
+
+  var gen = null;
+  var genFailed = false;
+
+  function initGen() {
+    if (gen && gen.gl && !gen.gl.isContextLost()) return gen;
+    gen = null;
+    if (genFailed) return null;
+    try {
+      var canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 16;
+      var gl = getGL(canvas, { antialias: false, alpha: false, preserveDrawingBuffer: true });
+      if (!gl) throw new Error('WebGL not available');
+      if (!hasHighp(gl)) throw new Error('GPU lacks high-precision floats');
+      var P = buildProgram(gl, VERT, GEN_FRAG, GEN_UNIFORMS, ['aPos']);
+      gl.useProgram(P.prog);
+      var buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      var dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+      var maxSize = Math.min(dims ? dims[0] : 2048, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 2048);
+      // A lost context is rebuilt on the next generate() call
+      canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); gen = null; }, false);
+      gen = { gl: gl, canvas: canvas, P: P, maxSize: maxSize };
+      return gen;
+    } catch (e) {
+      genFailed = true;
+      warn('GPU generator unavailable, using flat colour textures.', e);
+      return null;
+    }
+  }
+
+  function offsetFrom(rng) {
+    return [Math.floor(rng() * 900) + 7, Math.floor(rng() * 900) + 7];
+  }
+
+  function generateGL(name, size, seed) {
+    var g = initGen();
+    if (!g || size > g.maxSize) return null;
+    var gl = g.gl, loc = g.P.loc;
+    try {
+      var sp = SPECIES[name] || SPECIES.walnut;
+
+      // Pith position from the seed; same seed → same layout
+      var r = mulberry32(seed * 7919 + name.length * 131);
+      var cx = r() < 0.55 ? 0.15 + r() * 0.7 : (r() < 0.5 ? -0.4 - r() * 0.6 : 1.4 + r() * 0.6);
+      var v0 = 0.2 + r() * 0.6;
+      var nr = mulberry32(seed * 3 + 11);
+      var oA = offsetFrom(nr), oB = offsetFrom(nr), oC = offsetFrom(nr);
+
+      g.canvas.width = g.canvas.height = size;
+      gl.viewport(0, 0, size, size);
+      gl.useProgram(g.P.prog);
+      var l = rgb01(sp.light), d = rgb01(sp.dark);
+      gl.uniform1f(loc.uSize, size);
+      gl.uniform3f(loc.uLight, l[0], l[1], l[2]);
+      gl.uniform3f(loc.uDark, d[0], d[1], d[2]);
+      gl.uniform1f(loc.uRings, sp.rings);
+      gl.uniform1f(loc.uTilt, sp.tilt);
+      gl.uniform1f(loc.uSharp, sp.sharp);
+      gl.uniform1f(loc.uContrast, sp.contrast);
+      gl.uniform1f(loc.uFiber, sp.fiber);
+      gl.uniform1f(loc.uPores, sp.pores);
+      gl.uniform1f(loc.uRays, sp.rays);
+      gl.uniform1f(loc.uWarp, sp.warp);
+      gl.uniform1f(loc.uTone, sp.tone);
+      gl.uniform1f(loc.uCx, cx);
+      gl.uniform1f(loc.uV0, v0);
+      gl.uniform2f(loc.uOffA, oA[0], oA[1]);
+      gl.uniform2f(loc.uOffB, oB[0], oB[1]);
+      gl.uniform2f(loc.uOffC, oC[0], oC[1]);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      // Copy to a normal 2D canvas: cacheable, drawImage-able, immune to context loss
+      var out = document.createElement('canvas');
+      out.width = out.height = size;
+      out.getContext('2d').drawImage(g.canvas, 0, 0);
+      return out;
+    } catch (e) {
+      warn('texture generation failed', e);
+      return null;
+    }
+  }
+
+  // Last-resort texture when WebGL is unavailable: vertical light→dark gradient
+  function flatTexture(name, size) {
     var sp = SPECIES[name] || SPECIES.walnut;
-    var r  = mulberry32(seed * 7919 + name.length * 131);
-    var nA = makeNoise(seed * 3 + 1);
-    var nB = makeNoise(seed * 3 + 2);
-    var nC = makeNoise(seed * 3 + 3);
-
-    // Pith position relative to board — drives "cathedral" vs flat-straight grain.
-    var cx = r() < 0.55 ? 0.15 + r() * 0.7 : (r() < 0.5 ? -0.4 - r() * 0.6 : 1.4 + r() * 0.6);
-    var v0 = 0.2 + r() * 0.6;
-
-    var img = new ImageData(size, size);
-    var D = img.data;
-    var L = sp.light, K = sp.dark;
-
-    for (var y = 0; y < size; y++) {
-      var v = y / size;
-      for (var x = 0; x < size; x++) {
-        var u = x / size;
-
-        // ── Growth rings: distance from pith, warped by low-frequency FBM ──
-        var d  = Math.hypot(u - cx, (v - v0) * sp.tilt) + (fbm(nA, u * 2.5, v * 1.2, 3) - 0.5) * sp.warp;
-        var tk = d * sp.rings;
-        var k  = Math.floor(tk);
-        var f  = tk - k;
-        // Earlywood is pale and gradual; latewood is dark and abrupt.
-        var w  = Math.pow(f, sp.sharp) * (0.75 + 0.5 * nB(k * 1.7 + 0.3, 7.7));
-
-        // ── Fine fibers: squashed across grain, stretched along it ──
-        var fib = fbm(nB, u * 160, v * 7, 2) - 0.5;
-        var m   = 0.35 + (w - 0.4) * sp.contrast * 1.6 + fib * sp.fiber * 2;
-        m = m < 0 ? 0 : m > 1 ? 1 : m;
-
-        // Broad tonal variation across the board
-        var tone = 1 + (fbm(nC, u * 1.6, v * 1.2, 3) - 0.5) * sp.tone * 2;
-
-        var R = (L[0] + (K[0] - L[0]) * m) * tone;
-        var G = (L[1] + (K[1] - L[1]) * m) * tone;
-        var B = (L[2] + (K[2] - L[2]) * m) * tone;
-
-        // ── Pores: short dark dashes in earlywood (oak species) ──
-        if (sp.pores) {
-          var pr = nC(u * 200, v * 14);
-          if (pr > 0.78) {
-            var q = 1 - 0.55 * ((pr - 0.78) / 0.22) * sp.pores * (1 - f * 0.6);
-            R *= q; G *= q; B *= q;
-          }
-        }
-        // ── Medullary ray flecks: short light dashes across grain (oak) ──
-        if (sp.rays) {
-          var ry = nA(u * 8, v * 110);
-          if (ry > 0.82) {
-            var s = ((ry - 0.82) / 0.18) * sp.rays * 40;
-            R += s; G += s; B += s;
-          }
-        }
-
-        var idx = (y * size + x) * 4;
-        D[idx]     = R;   // Uint8ClampedArray clamps automatically
-        D[idx + 1] = G;
-        D[idx + 2] = B;
-        D[idx + 3] = 255;
-      }
-    }
-
-    // Apply muted overlay for winner-background variant (baked in, no extra pass)
-    if (isMuted) {
-      for (var i = 0; i < D.length; i += 4) {
-        D[i]     = D[i]     * 0.72 | 0;
-        D[i + 1] = D[i + 1] * 0.70 | 0;
-        D[i + 2] = D[i + 2] * 0.74 | 0;
-      }
-    }
-
     var c = document.createElement('canvas');
-    c.width = c.height = size;
-    c.getContext('2d').putImageData(img, 0, 0);
+    c.width = c.height = Math.min(size, 256);
+    var x = c.getContext('2d');
+    var gr = x.createLinearGradient(0, 0, 0, c.height);
+    gr.addColorStop(0, 'rgb(' + sp.light.join(',') + ')');
+    gr.addColorStop(1, 'rgb(' + sp.dark.join(',') + ')');
+    x.fillStyle = gr;
+    x.fillRect(0, 0, c.width, c.height);
     return c;
   }
 
-  // ── Generator switch ──────────────────────────────────────────────────────
-  // 'gl'  : WebGL fragment-shader generator from woodgrain-gl.js (milliseconds).
-  // 'cpu' : the original per-pixel JavaScript generator above (seconds at 2048 px).
-  // 'gl' silently falls back to 'cpu' if woodgrain-gl.js is missing or WebGL fails.
-  var engine = 'gl';
-
-  function generate(name, size, seed, isMuted) {
-    if (engine === 'gl' && root.WoodGrainGL) {
-      var c = root.WoodGrainGL.generate(name, size, seed, isMuted);
-      if (c) return c;
-    }
-    return generateCPU(name, size, seed, isMuted);
+  function generate(name, size, seed) {
+    name = SPECIES[name] ? name : 'walnut';
+    size = size || 1024;
+    seed = seed || 1;
+    return generateGL(name, size, seed) || flatTexture(name, size);
   }
 
-  function setEngine(e) {
-    e = (e === 'cpu') ? 'cpu' : 'gl';
-    if (e === engine) return;
-    engine = e;
-    // Textures from the other generator must not be reused
-    var k;
-    for (k in bgTexCache) { bgTexCache[k].width = bgTexCache[k].height = 0; }
-    bgTexCache = {}; bgTexOrder = [];
-    discTexCache = {}; discCache = {};
-  }
-
-  function getEngine() { return engine; }
-
-  // ── Disc Texture Cache (1024 px, one shared atlas per species) ────────────
-  // All discs of the same species crop from this ONE shared texture.
-  // This avoids generating a full texture per finger touch (the previous bug).
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Texture caches
+  // ═════════════════════════════════════════════════════════════════════════
+  // Disc atlas: ONE texture per species; every disc crops from it
   var discTexCache = {};
-
   function getDiscTexture(speciesKey) {
-    if (!discTexCache[speciesKey]) {
-      // Seed 42 for every species disc atlas — the per-disc seed controls crop/rotation only.
-      discTexCache[speciesKey] = generate(speciesKey, DISC_SIZE, 42);
-    }
+    if (!discTexCache[speciesKey]) discTexCache[speciesKey] = generate(speciesKey, DISC_SIZE, 42);
     return discTexCache[speciesKey];
   }
 
-  // ── Background Texture Cache (2048 px, per species+seed+muted) ───────────
-  // 2048 × 2048 ensures the texture is never upscaled at 3× DPR (460 PPI).
-  //
-  // Physical screen at 3× DPR: 2622 × 1206 px
-  // We cover-fit the texture: longer axis = 2622 px → scale = 2622/2048 = 1.28× upscale
-  // Shorter axis = 1206 px → scale = 1206/2048 = 0.59× — both are within comfortable range.
-  // Canvas bicubic interpolation makes 1.28× nearly invisible at 460 PPI.
+  // Table texture: small LRU (2048² RGBA ≈ 16 MB each)
   var bgTexCache = {};
-  var bgTexOrder = [];            // keys, oldest first
-  var BG_CACHE_MAX = 4;           // 2048² RGBA ≈ 16 MB each — cap so memory can't grow forever
-
-  /**
-   * Returns (and caches) a 2048 px master texture for backgrounds.
-   * The texture is always the full-brightness version; the muted winner-bg look
-   * is applied at draw time by renderBackground, so the flood and the following
-   * round's background share one texture instead of generating it twice.
-   * @param {string}  speciesKey
-   * @param {number}  seed        Controls pith/ring layout variety between sessions
-   */
+  var bgTexOrder = [];
+  var BG_CACHE_MAX = 3;
   function getMasterTexture(speciesKey, seed) {
-    speciesKey = speciesKey || 'walnut';
+    speciesKey = SPECIES[speciesKey] ? speciesKey : 'walnut';
     seed = (seed || 42) | 0;
     var key = speciesKey + '_' + seed;
-    if (bgTexCache[key]) {
-      // refresh recency
-      var i = bgTexOrder.indexOf(key);
-      if (i !== -1) bgTexOrder.splice(i, 1);
+    var i = bgTexOrder.indexOf(key);
+    if (i !== -1) {
+      bgTexOrder.splice(i, 1);
       bgTexOrder.push(key);
       return bgTexCache[key];
     }
-    bgTexCache[key] = generate(speciesKey, BG_SIZE, seed, false);
+    bgTexCache[key] = generate(speciesKey, BG_SIZE, seed);
     bgTexOrder.push(key);
     while (bgTexOrder.length > BG_CACHE_MAX) {
       var old = bgTexOrder.shift();
-      var oc = bgTexCache[old];
-      if (oc) { oc.width = oc.height = 0; }   // release the bitmap memory
+      if (bgTexCache[old]) bgTexCache[old].width = bgTexCache[old].height = 0;
       delete bgTexCache[old];
     }
     return bgTexCache[key];
   }
 
-  // ── Disc shading layer (edge darkening, highlight, rim, bevel) ────────────
-  // Shared by getDiscCanvas (drawn over the wood face) and getDiscOverlay (drawn
-  // over an arbitrary face, e.g. the winner's window into the flood texture).
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Wooden disc (2D canvas puck)
+  // ═════════════════════════════════════════════════════════════════════════
+  // Edge darkening, rim and bevel are baked in. The glossy highlight is NOT: app.js
+  // draws it live so it can follow the device tilt.
   function drawShading(ctx, r, diameter) {
     var TAU = Math.PI * 2;
-    // Edge shading (radial darkening toward rim — 3-D depth cue) ────
     ctx.save();
     ctx.beginPath();
     ctx.arc(r, r, r, 0, TAU);
@@ -264,27 +358,12 @@
     ctx.fillRect(0, 0, diameter, diameter);
     ctx.restore();
 
-    // Specular highlight (top-left lit, bottom-right shadowed) ───────
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
-    ctx.clip();
-    var specGrad = ctx.createLinearGradient(0, 0, diameter, diameter);
-    specGrad.addColorStop(0,   'rgba(255,255,255,0.22)');
-    specGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
-    specGrad.addColorStop(1,   'rgba(0,0,0,0.18)');
-    ctx.fillStyle = specGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
-    ctx.restore();
-
-    // Rim stroke ─────────────────────────────────────────────────────
     ctx.lineWidth   = r * 0.05;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
     ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
     ctx.stroke();
 
-    // Bevel highlight ────────────────────────────────────────────────
     ctx.lineWidth   = r * 0.03;
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
@@ -292,48 +371,24 @@
     ctx.stroke();
   }
 
-  var overlayCache = {};
-
-  /**
-   * Transparent canvas holding only the disc shading (no wood face, no shadow).
-   * Used to put the same 3-D look on top of a face drawn from another texture.
-   */
-  function getDiscOverlay(diameter) {
-    diameter = Math.max(32, diameter | 0);
-    if (overlayCache[diameter]) return overlayCache[diameter];
-    var c = document.createElement('canvas');
-    c.width = c.height = diameter;
-    drawShading(c.getContext('2d'), diameter / 2, diameter);
-    overlayCache[diameter] = c;
-    return c;
-  }
-
-  // ── Disc Renderer ──────────────────────────────────────────────────────────
   var discCache = {};
 
   /**
-   * Pre-renders a wooden disc canvas.
-   * Crops a randomly rotated patch from the shared 1024 px species atlas and
-   * composites edge shading / specular highlight / bevel on top.
-   *
-   * @param {number} diameter   Physical px size (pass baseRadius × 2 × dpr × 1.5 from app.js)
-   * @param {string} species    Species key
-   * @param {number} seed       Per-disc seed — controls crop origin and rotation only
-   * @param {number} [shadeShift]  –0.25..+0.25 darkens/lightens the face
-   * @returns {HTMLCanvasElement}
+   * @param {number} diameter   Physical px (baseRadius × 2 × dpr × 1.5)
+   * @param {string} species
+   * @param {number} seed       Per-disc: crop origin and rotation only
+   * @param {number} [shadeShift]  -0.25..+0.25 darkens/lightens the face
    */
   function getDiscCanvas(diameter, species, seed, shadeShift) {
     diameter   = Math.max(32, diameter | 0);
-    species    = species    || 'walnut';
+    species    = SPECIES[species] ? species : 'walnut';
     seed       = (seed || 1) | 0;
     shadeShift = shadeShift || 0;
 
     var cacheKey = species + '_' + diameter + '_' + seed + '_' + shadeShift.toFixed(2);
     if (discCache[cacheKey]) return discCache[cacheKey];
 
-    // Shared 1024 px atlas — never generated more than once per species.
     var tex  = getDiscTexture(species);
-    // Per-disc PRNG drives crop origin + rotation (independent of texture generation).
     var rand = mulberry32(seed * 3571 + diameter);
     var TAU  = Math.PI * 2;
 
@@ -342,169 +397,458 @@
     var ctx = c.getContext('2d');
     var r   = diameter / 2;
 
-    // NOTE: no drop shadow is baked in here. The disc fills the whole canvas, so any
-    // shadow drawn into it gets clipped at the canvas edge and shows up as a faint
-    // square around the disc. app.js draws the shadow live on the main canvas instead.
-
-    // ── 1. Wood face: random crop + rotation from shared species atlas ────
-    // Crop a 55% window (560 px of 1024) so we can randomise the patch origin
-    // while keeping plenty of grain detail even after downscaling to the disc.
+    // Wood face: random rotated crop (55% window) of the species atlas
     ctx.save();
     ctx.beginPath();
     ctx.arc(r, r, r, 0, TAU);
     ctx.clip();
     ctx.translate(r, r);
     ctx.rotate(rand() * TAU);
-    var sw = tex.width * 0.55;                     // 563 px crop from 1024 px atlas
+    var sw = tex.width * 0.55;
     var ox = rand() * (tex.width  - sw);
     var oy = rand() * (tex.height - sw);
     ctx.drawImage(tex, ox, oy, sw, sw, -r, -r, 2 * r, 2 * r);
     ctx.restore();
 
-    // ── 2. Optional shade shift (per-disc darkness/lightness variance) ────
     if (shadeShift !== 0) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(r, r, r, 0, TAU);
       ctx.clip();
-      if (shadeShift < 0) {
-        ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')';
-      } else {
-        ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.6, shadeShift).toFixed(3) + ')';
-      }
+      ctx.fillStyle = shadeShift < 0
+        ? 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')'
+        : 'rgba(255,255,255,' + Math.min(0.6, shadeShift).toFixed(3) + ')';
       ctx.fillRect(0, 0, diameter, diameter);
       ctx.restore();
     }
 
-    // ── 3. Edge shading, specular highlight, rim and bevel ────────────────
     drawShading(ctx, r, diameter);
-
     discCache[cacheKey] = c;
     return c;
   }
 
-  // ── Species recolour ──────────────────────────────────────────────────────
-  // Every texture pixel lies (roughly) on the line from the species' earlywood colour
-  // to its latewood colour. Project each pixel onto that line to get its position m
-  // (0 = light, 1 = dark), then re-colour it along the TARGET species' line. Grain is
-  // preserved; colour and brightness become the target wood's. The pixel's broad tonal
-  // variation (brightness relative to the line) is kept via the k ratio.
-  function recolor(ctx, pw, ph, fromKey, toKey) {
-    var A = SPECIES[fromKey] || SPECIES.walnut, B = SPECIES[toKey];
-    if (!B || A === B) return;
-    var img = ctx.getImageData(0, 0, pw, ph), D = img.data;
-    var Lr = A.light[0], Lg = A.light[1], Lb = A.light[2];
-    var dr = A.dark[0] - Lr, dg = A.dark[1] - Lg, db = A.dark[2] - Lb;
-    var denom = (dr * dr + dg * dg + db * db) || 1;
-    var Br = B.light[0], Bg = B.light[1], Bb = B.light[2];
-    var er = B.dark[0] - Br, eg = B.dark[1] - Bg, eb = B.dark[2] - Bb;
-    for (var i = 0; i < D.length; i += 4) {
-      var r = D[i], g = D[i + 1], b = D[i + 2];
-      var m = ((r - Lr) * dr + (g - Lg) * dg + (b - Lb) * db) / denom;
-      m = m < 0 ? 0 : m > 1 ? 1 : m;
-      var ta = (Lr + dr * m) + (Lg + dg * m) + (Lb + db * m);
-      var k = ta > 0 ? (r + g + b) / ta : 1;
-      k = k < 0.8 ? 0.8 : k > 1.25 ? 1.25 : k;
-      D[i]     = (Br + er * m) * k;   // Uint8ClampedArray clamps automatically
-      D[i + 1] = (Bg + eg * m) * k;
-      D[i + 2] = (Bb + eb * m) * k;
-    }
-    ctx.putImageData(img, 0, 0);
-  }
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Live table layer (WebGL canvas inside a container element)
+  // ═════════════════════════════════════════════════════════════════════════
+  // One shader draws the whole table every frame:
+  //   - the cached grain texture, cover-fitted to the screen
+  //   - recolour of that grain to another species (colour AND brightness)
+  //   - the winner flood: a feathered, rippling circle in a second species
+  //   - varnish sheen that follows tilt / drifts slowly
+  //   - vignette
+  var BG_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    'uniform sampler2D uTex;',
+    'uniform vec2 uRes, uOrigin, uDraw, uFloodC, uTilt;',
+    'uniform vec3 uSrcL, uSrcD, uTabL, uTabD, uFlL, uFlD;',
+    'uniform float uTabOn, uFloodOn, uFloodR, uFloodF, uRipple, uTime, uSheen, uVig;',
+    '',
+    '// Re-colour a pixel of species S to species T, keeping the grain',
+    'vec3 recolor(vec3 c, vec3 sL, vec3 sD, vec3 tL, vec3 tD) {',
+    '  vec3 d = sD - sL;',
+    '  float m = clamp(dot(c - sL, d) / max(dot(d, d), 0.00001), 0.0, 1.0);',
+    '  vec3 a = sL + d * m;',
+    '  float k = clamp((c.r + c.g + c.b) / max(a.r + a.g + a.b, 0.0001), 0.8, 1.25);',
+    '  return (tL + (tD - tL) * m) * k;',
+    '}',
+    '',
+    'void main() {',
+    '  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
+    '  vec2 tc = (p - uOrigin) / uDraw;',
+    '  vec3 tex = texture2D(uTex, tc).rgb;',
+    '  vec3 col = tex;',
+    '  if (uTabOn > 0.5) col = recolor(tex, uSrcL, uSrcD, uTabL, uTabD);',
+    '',
+    '  if (uFloodOn > 0.5) {',
+    '    vec2 dv = p - uFloodC;',
+    '    float dist = length(dv);',
+    '    float ang = atan(dv.y, dv.x + 0.0001);',
+    '    float f = max(uFloodF, 1.0);',
+    '    float edge = uFloodR + uRipple * 0.25 * f * sin(ang * 9.0 + uTime * 5.0);',
+    '    float mask = 1.0 - smoothstep(edge - f, edge, dist);',
+    '    vec3 fl = recolor(tex, uSrcL, uSrcD, uFlL, uFlD);',
+    '    col = mix(col, fl, mask);',
+    '    float q = (dist - (edge - f * 0.5)) / max(f * 0.6, 1.0);',
+    '    col += exp(-q * q) * uRipple * 0.12;',
+    '  }',
+    '',
+    '  // Varnish sheen: soft highlight that follows tilt, brighter where grain is pale',
+    '  float lum = dot(tex, vec3(0.299, 0.587, 0.114));',
+    '  vec2 q2 = p / uRes;',
+    '  vec2 c = vec2(0.5 + uTilt.x * 0.40 + 0.10 * sin(uTime * 0.7), 0.35 + uTilt.y * 0.30 + 0.06 * cos(uTime * 0.5));',
+    '  vec2 dq = (q2 - c) * vec2(1.0, uRes.y / uRes.x);',
+    '  float g = exp(-dot(dq, dq) / 0.08);',
+    '  float sy = (q2.y - c.y) * 3.0;',
+    '  float streak = exp(-sy * sy) * 0.35;',
+    '  col += (g * 0.7 + streak * g) * uSheen * 0.35 * (0.55 + 0.9 * lum) * vec3(1.0, 0.97, 0.90);',
+    '',
+    '  vec2 pc = p - uRes * 0.5;',
+    '  float r0 = min(uRes.x, uRes.y) * 0.3;',
+    '  float r1 = max(uRes.x, uRes.y) * 0.75;',
+    '  float vv = clamp((length(pc) - r0) / (r1 - r0), 0.0, 1.0);',
+    '  col *= 1.0 - uVig * vv;',
+    '',
+    '  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);',
+    '}'
+  ].join('\n');
 
-  // ── Background Renderer ───────────────────────────────────────────────────
+  var BG_UNIFORMS = ['uTex', 'uRes', 'uOrigin', 'uDraw', 'uSrcL', 'uSrcD', 'uTabL', 'uTabD', 'uTabOn',
+                     'uFlL', 'uFlD', 'uFloodOn', 'uFloodC', 'uFloodR', 'uFloodF', 'uRipple',
+                     'uTime', 'uTilt', 'uSheen', 'uVig'];
+
   /**
-   * Renders the woodgrain tabletop background into a container div.
-   * Uses a 2048 px texture with cover-fit scaling (like background-size: cover)
-   * so the full physical canvas is filled without upscaling artefacts at 3× DPR.
-   *
-   * At 460 PPI / 3× DPR (physical 2622 × 1206):
-   *   - Texture: 2048 × 2048
-   *   - Long edge scale: 2622 / 2048 = 1.28× — microscopic softening at 460 PPI
-   *   - Short edge scale: 1206 / 2048 = 0.59× — sharp downscale
-   *
-   * @param {Element} container   #wood-bg or #wood-bg-winner div
-   * @param {string}  speciesKey
-   * @param {number}  seed
-   * @param {boolean} isMuted
-   * @param {string} [recolorTo]  Species key to recolour the wood to, keeping the grain
+   * draw(state):
+   *   species, seed   table grain
+   *   table           species key to recolour the table to, or null (natural)
+   *   flood           { x, y, r, feather, ripple, target } in CSS px, or null
+   *   time            seconds (sheen drift, edge ripple)
+   *   tiltX, tiltY    -1..1
+   *   sheen, vignette 0..1
+   * Returns false if the GPU layer is unavailable.
    */
-  function renderBackground(container, speciesKey, seed, isMuted, recolorTo) {
-    if (!container) return;
-    speciesKey = speciesKey || 'walnut';
-    seed = (seed || 42) | 0;
+  function createBackground(container) {
+    var cv = document.createElement('canvas');
+    cv.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
+    container.innerHTML = '';
+    container.appendChild(cv);
 
-    // Reuse or create a <canvas> inside the container
-    var cvs = container.querySelector('canvas');
-    if (!cvs) {
-      cvs = document.createElement('canvas');
-      cvs.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
-      container.innerHTML = '';
-      container.appendChild(cvs);
+    var L = { onRestore: null, available: true };
+    var gl = null, P = null, buf = null, tex = null, texKey = '', tw = 1, th = 1;
+    var failed = false, lost = false;
+
+    function build() {
+      gl = getGL(cv, { alpha: false, antialias: false });
+      if (!gl) throw new Error('WebGL not available');
+      if (!hasHighp(gl)) throw new Error('GPU lacks high-precision floats');
+      P = buildProgram(gl, VERT, BG_FRAG, BG_UNIFORMS, ['aPos']);
+      buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
+      tex = null;
+      texKey = '';
     }
 
-    var dpr = window.devicePixelRatio || 1;
-    var w   = container.offsetWidth  || window.innerWidth;
-    var h   = container.offsetHeight || window.innerHeight;
-    var pw  = Math.round(w * dpr);    // physical pixels wide
-    var ph  = Math.round(h * dpr);    // physical pixels tall
-
-    cvs.width  = pw;
-    cvs.height = ph;
-
-    var ctx = cvs.getContext('2d');
-    // imageSmoothingQuality 'high' enables bicubic filtering — matters for the
-    // 1.28× upscale on the long axis at 3× DPR.
-    ctx.imageSmoothingEnabled  = true;
-    ctx.imageSmoothingQuality  = 'high';
-
-    var tex = getMasterTexture(speciesKey, seed);
-
-    // ── Cover-fit: scale texture uniformly so it fills the physical canvas ──
-    // This matches CSS `background-size: cover` behaviour.  One axis will be
-    // exactly filled; the other is cropped (centred) if the texture is taller.
-    var scaleX = pw / tex.width;
-    var scaleY = ph / tex.height;
-    var scale  = Math.max(scaleX, scaleY);
-    var dw     = tex.width  * scale;
-    var dh     = tex.height * scale;
-    var dx     = (pw - dw) / 2;
-    var dy     = (ph - dh) / 2;
-
-    ctx.drawImage(tex, dx, dy, dw, dh);
-
-    // Muted variant (previous-winner background): same factors the old baked-in
-    // version used (0.72 / 0.70 / 0.74), applied as a multiply overlay.
-    if (isMuted) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = 'rgb(184,179,189)';
-      ctx.fillRect(0, 0, pw, ph);
-      ctx.restore();
+    try {
+      build();
+    } catch (e) {
+      failed = true;
+      L.available = false;
+      warn('table layer unavailable, using flat background.', e);
+      container.style.background = 'rgb(' + SPECIES.walnut.dark.join(',') + ')';
     }
 
-    // Recolour to another species (keeps this texture's grain, takes the target's
-    // colour AND brightness).
-    if (recolorTo && recolorTo !== speciesKey) recolor(ctx, pw, ph, speciesKey, recolorTo);
+    cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); lost = true; }, false);
+    cv.addEventListener('webglcontextrestored', function () {
+      try { build(); lost = false; if (L.onRestore) L.onRestore(); }
+      catch (e) { failed = true; L.available = false; warn('could not restore table layer', e); }
+    }, false);
 
-    // ── Vignette: subtle radial darkening toward the edges (table-depth cue) ─
-    var vig = ctx.createRadialGradient(
-      pw / 2, ph / 2, Math.min(pw, ph) * 0.3,
-      pw / 2, ph / 2, Math.max(pw, ph) * 0.75
-    );
-    vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, 'rgba(0,0,0,0.28)');
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, pw, ph);
+    function upload(src) {
+      if (tex) gl.deleteTexture(tex);
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+      tw = src.width; th = src.height;
+      var pot = (tw & (tw - 1)) === 0 && (th & (th - 1)) === 0;
+      if (pot) gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, pot ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+
+    L.draw = function (s) {
+      if (failed || lost || !gl || gl.isContextLost()) return false;
+      try {
+        var dpr = window.devicePixelRatio || 1;
+        var w = container.offsetWidth || window.innerWidth;
+        var h = container.offsetHeight || window.innerHeight;
+        var pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
+        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+        gl.viewport(0, 0, pw, ph);
+
+        var species = SPECIES[s.species] ? s.species : 'walnut';
+        var key = species + '_' + ((s.seed || 42) | 0);
+        gl.useProgram(P.prog);
+        if (key !== texKey || !tex) {
+          upload(getMasterTexture(species, s.seed));
+          texKey = key;
+        }
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.uniform1i(P.loc.uTex, 0);
+
+        // Cover-fit the texture to the screen
+        var scale = Math.max(pw / tw, ph / th);
+        var dw = tw * scale, dh = th * scale;
+        gl.uniform2f(P.loc.uRes, pw, ph);
+        gl.uniform2f(P.loc.uOrigin, (pw - dw) / 2, (ph - dh) / 2);
+        gl.uniform2f(P.loc.uDraw, dw, dh);
+
+        var src = SPECIES[species], c;
+        c = rgb01(src.light); gl.uniform3f(P.loc.uSrcL, c[0], c[1], c[2]);
+        c = rgb01(src.dark);  gl.uniform3f(P.loc.uSrcD, c[0], c[1], c[2]);
+
+        var tab = SPECIES[s.table];
+        gl.uniform1f(P.loc.uTabOn, tab ? 1 : 0);
+        c = rgb01((tab || src).light); gl.uniform3f(P.loc.uTabL, c[0], c[1], c[2]);
+        c = rgb01((tab || src).dark);  gl.uniform3f(P.loc.uTabD, c[0], c[1], c[2]);
+
+        var fl = s.flood, ft = fl && SPECIES[fl.target];
+        gl.uniform1f(P.loc.uFloodOn, ft ? 1 : 0);
+        c = rgb01((ft || src).light); gl.uniform3f(P.loc.uFlL, c[0], c[1], c[2]);
+        c = rgb01((ft || src).dark);  gl.uniform3f(P.loc.uFlD, c[0], c[1], c[2]);
+        gl.uniform2f(P.loc.uFloodC, ft ? fl.x * dpr : 0, ft ? fl.y * dpr : 0);
+        gl.uniform1f(P.loc.uFloodR, ft ? fl.r * dpr : 0);
+        gl.uniform1f(P.loc.uFloodF, ft ? Math.max(1, (fl.feather || 0) * dpr) : 1);
+        gl.uniform1f(P.loc.uRipple, ft ? (fl.ripple || 0) : 0);
+
+        gl.uniform1f(P.loc.uTime, s.time || 0);
+        gl.uniform2f(P.loc.uTilt, s.tiltX || 0, s.tiltY || 0);
+        gl.uniform1f(P.loc.uSheen, s.sheen || 0);
+        gl.uniform1f(P.loc.uVig, s.vignette || 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        return true;
+      } catch (e) {
+        failed = true;
+        L.available = false;
+        warn('table layer draw failed', e);
+        return false;
+      }
+    };
+
+    return L;
   }
 
-  // ── Utility Helpers ───────────────────────────────────────────────────────
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Winner effects layer (transparent WebGL canvas above the arena)
+  // ═════════════════════════════════════════════════════════════════════════
+  // Shockwave ring + glow halo (full-screen quad) and a particle burst (GL points).
+  var FX_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    'uniform vec2 uResPx, uC;',
+    'uniform float uDpr, uT, uShock, uGlow, uDiscR;',
+    'uniform vec3 uColor;',
+    'void main() {',
+    '  vec2 p = vec2(gl_FragCoord.x, uResPx.y - gl_FragCoord.y) / uDpr;',
+    '  float d = length(p - uC);',
+    '  float a = 0.0;',
+    '  if (uShock > 0.5 && uT < 0.9) {',
+    '    float R = 40.0 + 520.0 * (1.0 - exp(-uT * 3.2));',
+    '    float w = 14.0 + 26.0 * uT;',
+    '    float q = (d - R) / w;',
+    '    a += exp(-q * q) * (1.0 - uT / 0.9) * 0.6;',
+    '  }',
+    '  if (uGlow > 0.5 && uT < 1.8) {',
+    '    float fade = 1.0 - smoothstep(0.5, 1.8, uT);',
+    '    float halo = exp(-max(d - uDiscR, 0.0) / (uDiscR * 0.6));',
+    '    halo *= smoothstep(uDiscR * 0.97, uDiscR * 1.03, d);',
+    '    a += halo * fade * (0.55 + 0.15 * sin(uT * 10.0));',
+    '  }',
+    '  a = clamp(a, 0.0, 1.0);',
+    '  vec3 c = mix(uColor, vec3(1.0), 0.3);',
+    '  gl_FragColor = vec4(c * a, a);',
+    '}'
+  ].join('\n');
+
+  var PART_VERT = [
+    'attribute vec4 aP;',            // x angle, y speed, z size, w colour mix
+    'uniform vec2 uC, uRes;',        // burst centre / viewport, CSS px
+    'uniform float uT, uDpr;',
+    'uniform vec3 uColA, uColB;',
+    'varying vec4 vCol;',
+    'void main() {',
+    '  vec2 dir = vec2(cos(aP.x), sin(aP.x));',
+    '  float k = 3.0;',
+    '  vec2 pos = uC + dir * aP.y * (1.0 - exp(-k * uT)) / k + vec2(0.0, 220.0 * uT * uT);',
+    '  float life = clamp(1.0 - uT / 1.5, 0.0, 1.0);',
+    '  gl_Position = vec4(pos.x / uRes.x * 2.0 - 1.0, 1.0 - pos.y / uRes.y * 2.0, 0.0, 1.0);',
+    '  gl_PointSize = aP.z * uDpr * (0.4 + 0.6 * life);',
+    '  vCol = vec4(mix(uColA, uColB, aP.w) * life, life);',
+    '}'
+  ].join('\n');
+
+  var PART_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    'varying vec4 vCol;',
+    'void main() {',
+    '  float d = length(gl_PointCoord - vec2(0.5));',
+    '  float m = 1.0 - smoothstep(0.35, 0.5, d);',
+    '  gl_FragColor = vCol * m;',
+    '}'
+  ].join('\n');
+
+  var FX_DURATION = 1.8;   // seconds
+
+  function createEffects(cv) {
+    var L = { onRestore: null, available: true };
+    var gl = null, Q = null, PR = null, quadBuf = null, pBuf = null;
+    var failed = false, lost = false;
+    var st = { active: false, t0: 0, x: 0, y: 0, color: [1, 1, 1], discR: 60, shock: true, glow: true,
+               n: 0, colA: [1, 1, 1], colB: [1, 1, 1] };
+
+    function build() {
+      gl = getGL(cv, { alpha: true, premultipliedAlpha: true, antialias: false });
+      if (!gl) throw new Error('WebGL not available');
+      if (!hasHighp(gl)) throw new Error('GPU lacks high-precision floats');
+      Q = buildProgram(gl, VERT, FX_FRAG, ['uResPx', 'uC', 'uDpr', 'uT', 'uShock', 'uGlow', 'uDiscR', 'uColor'], ['aPos']);
+      PR = buildProgram(gl, PART_VERT, PART_FRAG, ['uC', 'uRes', 'uT', 'uDpr', 'uColA', 'uColB'], ['aP']);
+      quadBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
+      pBuf = gl.createBuffer();
+      st.n = 0;       // particle buffer contents are gone after a rebuild
+    }
+
+    try {
+      build();
+    } catch (e) {
+      failed = true;
+      L.available = false;
+      warn('effects layer unavailable (effects disabled).', e);
+    }
+
+    cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); lost = true; st.active = false; }, false);
+    cv.addEventListener('webglcontextrestored', function () {
+      try { build(); lost = false; if (L.onRestore) L.onRestore(); }
+      catch (e) { failed = true; L.available = false; }
+    }, false);
+
+    function clear() {
+      if (failed || lost || !gl || gl.isContextLost()) return;
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
+    function toArr(c, fallback) {
+      return c ? [c.r / 255, c.g / 255, c.b / 255] : fallback;
+    }
+
+    /**
+     * opts: color {r,g,b} for ring/glow, discR (CSS px, winner's final radius),
+     *       shock, glow (bool), particles (count), colA / colB {r,g,b} particle colours
+     */
+    L.trigger = function (x, y, opts) {
+      if (failed || lost || !gl || gl.isContextLost()) return;
+      opts = opts || {};
+      st.active = true;
+      st.t0 = performance.now();
+      st.x = x; st.y = y;
+      st.color = toArr(opts.color, [1, 1, 1]);
+      st.discR = Math.max(8, opts.discR || 60);
+      st.shock = !!opts.shock;
+      st.glow = !!opts.glow;
+      st.colA = toArr(opts.colA, st.color);
+      st.colB = toArr(opts.colB, st.color);
+
+      var n = Math.max(0, Math.min(400, (opts.particles | 0)));
+      st.n = n;
+      if (n > 0) {
+        var arr = new Float32Array(n * 4);
+        for (var i = 0; i < n; i++) {
+          arr[i * 4]     = Math.random() * Math.PI * 2;    // angle
+          arr[i * 4 + 1] = 120 + Math.random() * 320;      // speed, px/s
+          arr[i * 4 + 2] = 3 + Math.random() * 6;          // size, px
+          arr[i * 4 + 3] = Math.random();                  // colour mix
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+      }
+    };
+
+    L.isActive = function () { return st.active && !failed && !lost; };
+
+    L.stop = function () {
+      if (!st.active) return;
+      st.active = false;
+      clear();
+    };
+
+    // Returns true while the effect is still running (caller keeps animating)
+    L.draw = function (now) {
+      if (failed || lost || !gl || gl.isContextLost() || !st.active) return false;
+      try {
+        var dpr = window.devicePixelRatio || 1;
+        var w = window.innerWidth, h = window.innerHeight;
+        var pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
+        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+        gl.viewport(0, 0, pw, ph);
+        clear();
+
+        var t = Math.max(0, (now - st.t0) / 1000);
+        if (t >= FX_DURATION) { st.active = false; return false; }
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        if (st.shock || st.glow) {
+          gl.useProgram(Q.prog);
+          gl.uniform2f(Q.loc.uResPx, pw, ph);
+          gl.uniform2f(Q.loc.uC, st.x, st.y);
+          gl.uniform1f(Q.loc.uDpr, dpr);
+          gl.uniform1f(Q.loc.uT, t);
+          gl.uniform1f(Q.loc.uShock, st.shock ? 1 : 0);
+          gl.uniform1f(Q.loc.uGlow, st.glow ? 1 : 0);
+          gl.uniform1f(Q.loc.uDiscR, st.discR);
+          gl.uniform3f(Q.loc.uColor, st.color[0], st.color[1], st.color[2]);
+          gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+          gl.enableVertexAttribArray(0);
+          gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        if (st.n > 0) {
+          gl.useProgram(PR.prog);
+          gl.uniform2f(PR.loc.uC, st.x, st.y);
+          gl.uniform2f(PR.loc.uRes, w, h);
+          gl.uniform1f(PR.loc.uT, t);
+          gl.uniform1f(PR.loc.uDpr, dpr);
+          gl.uniform3f(PR.loc.uColA, st.colA[0], st.colA[1], st.colA[2]);
+          gl.uniform3f(PR.loc.uColB, st.colB[0], st.colB[1], st.colB[2]);
+          gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
+          gl.enableVertexAttribArray(0);
+          gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+          gl.drawArrays(gl.POINTS, 0, st.n);
+        }
+        gl.disable(gl.BLEND);
+        return true;
+      } catch (e) {
+        failed = true;
+        L.available = false;
+        warn('effects draw failed', e);
+        return false;
+      }
+    };
+
+    return L;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  //  Utility helpers
+  // ═════════════════════════════════════════════════════════════════════════
   function getSpeciesKey(index) {
     index = Math.max(0, Math.min(SPECIES_KEYS.length - 1, index | 0));
     return SPECIES_KEYS[index];
   }
 
-  // Base colour of a species: midpoint of its earlywood and latewood colours.
+  // Base colour of a species: midpoint of its earlywood and latewood colours
   function getBaseColor(name) {
     var sp = SPECIES[name] || SPECIES.walnut;
     return {
@@ -518,18 +862,14 @@
     return SPECIES_KEYS[Math.floor(Math.random() * SPECIES_KEYS.length)];
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
   root.WoodGrain = {
     SPECIES:          SPECIES,
     SPECIES_KEYS:     SPECIES_KEYS,
     mulberry32:       mulberry32,
     generate:         generate,
-    setEngine:        setEngine,
-    getEngine:        getEngine,
-    getMasterTexture: getMasterTexture,
     getDiscCanvas:    getDiscCanvas,
-    getDiscOverlay:   getDiscOverlay,
-    renderBackground: renderBackground,
+    createBackground: createBackground,
+    createEffects:    createEffects,
     getSpeciesKey:    getSpeciesKey,
     getBaseColor:     getBaseColor,
     getRandomSpecies: getRandomSpecies

@@ -22,11 +22,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Crisp Resolution-Independent SVG Tabletop Background -->
+  <!-- GPU woodgrain tabletop (WebGL canvas is created inside by woodgrain.js) -->
   <div id="wood-bg" aria-hidden="true"></div>
-  <div id="wood-bg-winner" aria-hidden="true"></div>
 
   <canvas id="arena"></canvas>
+
+  <!-- GPU winner effects (shockwave, glow, particles) -->
+  <canvas id="fx" aria-hidden="true"></canvas>
 
   <!-- Top-Right Settings Gear Icon -->
   <button id="tune-btn" type="button" aria-label="Settings">⚙</button>
@@ -65,7 +67,6 @@
   </div>
 
   <script src="woodgrain.js"></script>
-  <script src="woodgrain-gl.js"></script>
   <script src="sound.js"></script>
   <script src="settings.js"></script>
   <script src="app.js"></script>

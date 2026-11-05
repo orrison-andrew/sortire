@@ -7,6 +7,7 @@
 
   var GROUPS = {
     MODE: { title: 'Game Mode' },
+    WOOD: { title: 'Woodgrain' },
     WINNER: { title: 'Winner Options' },
     AUDIO: { title: 'Audio & Feedback' },
     COLORS: { title: 'Color Controls' },
@@ -17,6 +18,14 @@
 
   var SETTINGS_SCHEMA = [
     // Winner Options
+    { key: 'woodgrain_enabled', group: 'WOOD', label: 'Enable woodgrain style', def: 1, isBool: true, resetsRound: true },
+    { key: 'wood_type', group: 'WOOD', label: 'Wood species', def: 3, min: 0, max: 11, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart', 'Cherry', 'Pine', 'Mahogany', 'Padauk', 'Zebrawood', 'Yellowheart'], resetsRound: true },
+    { key: 'wood_vignette', group: 'WOOD', label: 'Table vignette', def: 0.28, min: 0, max: 0.6, step: 0.02 },
+    { key: 'wood_sheen', group: 'WOOD', label: 'Varnish sheen', def: 0.5, min: 0, max: 1, step: 0.05 },
+    { key: 'wood_sheen_anim', group: 'WOOD', label: 'Animate sheen and edge ripple', def: 1, isBool: true },
+    { key: 'wood_tilt', group: 'WOOD', label: 'Tilt-driven lighting', def: 1, isBool: true },
+    { key: 'disc_gloss', group: 'WOOD', label: 'Disc gloss', def: 0.8, min: 0, max: 1, step: 0.05 },
+    { key: 'wood_flood_ripple', group: 'WOOD', label: 'Flood edge ripple', def: 0.4, min: 0, max: 1, step: 0.05 },
     { key: 'winner_flood', group: 'WINNER', label: 'Winner floods the screen', def: 1, isBool: true },
     { key: 'marker_enabled', group: 'WINNER', label: 'Show winner marker ring', def: 0, isBool: true },
     { key: 'winner_fade_ms', group: 'WINNER', label: 'Losers fade-out time', def: 300, min: 0, max: 1500, step: 50, unit: 'ms' },
@@ -24,6 +33,10 @@
     { key: 'marker_radius', group: 'WINNER', label: 'Marker ring size', def: 1.3, min: 1, max: 2, step: 0.05, unit: '×' },
     { key: 'marker_stroke', group: 'WINNER', label: 'Marker ring thickness', def: 8, min: 0, max: 20, step: 1, unit: 'dp' },
     { key: 'marker_dot', group: 'WINNER', label: 'Marker center dot size', def: 0.45, min: 0, max: 1, step: 0.05, unit: '×' },
+    { key: 'flood_feather', group: 'WINNER', label: 'Flood edge softness', def: 60, min: 0, max: 200, step: 5, unit: 'dp' },
+    { key: 'fx_shockwave', group: 'WINNER', label: 'Winner shockwave ring', def: 1, isBool: true },
+    { key: 'fx_glow', group: 'WINNER', label: 'Winner glow', def: 1, isBool: true },
+    { key: 'fx_particles', group: 'WINNER', label: 'Winner particle burst (0 = off)', def: 80, min: 0, max: 200, step: 10 },
 
     // Audio & Feedback
     { key: 'sound_enabled', group: 'AUDIO', label: 'Enable sound effects', def: 1, isBool: true },
@@ -31,7 +44,6 @@
 
     // Color Controls
     { key: 'winner_bg_enabled', group: 'COLORS', label: 'Background from last winner', def: 1, isBool: true, resetsRound: false },
-    { key: 'woodgrain_enabled', group: 'COLORS', label: 'Enable woodgrain style', def: 1, isBool: true, resetsRound: true },
     { key: 'random_hue', group: 'COLORS', label: 'Random background hue each round', def: 0, isBool: true, resetsRound: true },
     { key: 'base_hue', group: 'COLORS', label: 'Background hue', def: 260, min: 0, max: 360, step: 5, unit: '°', resetsRound: true },
     { key: 'bg_saturation', group: 'COLORS', label: 'Background saturation', def: 0.45, min: 0, max: 1, step: 0.02, resetsRound: true },
@@ -42,8 +54,6 @@
     { key: 'value_odd', group: 'COLORS', label: 'Brightness (2nd, 4th… finger)', def: 1, min: 0, max: 1, step: 0.02, resetsRound: true },
 
     // Appearance & Themes
-    { key: 'wood_type', group: 'APPEARANCE', label: 'Wood species', def: 3, min: 0, max: 5, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart'], resetsRound: true },
-    { key: 'wood_gl', group: 'APPEARANCE', label: 'GPU woodgrain (fast, experimental)', def: 1, isBool: true, resetsRound: true },
     { key: 'radius', group: 'APPEARANCE', label: 'Circle radius', def: 60, min: 20, max: 120, step: 2, unit: 'dp' },
     { key: 'pulse_amount', group: 'APPEARANCE', label: 'Pulse amount', def: 0, min: 0, max: 0.3, step: 0.01 },
     { key: 'pulse_speed', group: 'APPEARANCE', label: 'Pulse speed', def: 0, min: 0, max: 20, step: 0.5 },

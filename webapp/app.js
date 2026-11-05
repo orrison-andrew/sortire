@@ -178,18 +178,76 @@
     requestDraw();
   }
 
-  function updateTabletopBackground() {
-    var bgEl = document.getElementById('wood-bg');
-    if (!bgEl) return;
+  // --- Woodgrain table + winner effects (GPU layers, see woodgrain.js) ---
+  var woodBg = null;            // live table layer
+  var fx = null;                // winner effects layer (shockwave, glow, particles)
+  var floodTableWood = null;    // wood the table showed when the current flood started
 
-    var woodOn = Settings.bool('woodgrain_enabled');
-    if (!woodOn) return;   // canvas draw() handles the colour fill instead
+  // Wood the table is recoloured to right now (the previous winner's), or null = natural
+  function currentTableWood() {
+    return (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
+  }
 
-    // The grain (species texture + seed) stays the same between rounds. With
-    // winner_bg_enabled ON it is recoloured to the previous winner's wood, which is
-    // exactly what the winner flood ended on, so there is no visible jump.
-    var recolorTo = (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
-    WoodGrain.renderBackground(bgEl, getBaseWoodTypeKey(), bgSeed, /*isMuted=*/false, recolorTo);
+  // --- Device tilt: moves the sheen, the disc gloss and the disc shadows ---
+  var tilt = { x: 0, y: 0, settled: false, pending: false };
+
+  function onDeviceOrientation(e) {
+    if (!Settings.bool('wood_tilt') || e.gamma === null || e.beta === null) return;
+    var nx = Math.max(-1, Math.min(1, e.gamma / 30));
+    var ny = Math.max(-1, Math.min(1, (e.beta - 40) / 30));
+    var px = tilt.x, py = tilt.y;
+    tilt.x += (nx - tilt.x) * 0.25;     // low-pass filter
+    tilt.y += (ny - tilt.y) * 0.25;
+    if (Math.abs(tilt.x - px) + Math.abs(tilt.y - py) > 0.004) requestDraw();
+  }
+
+  // iOS only delivers orientation events after a permission prompt that must come from a tap
+  function requestTiltPermission() {
+    if (tilt.settled || tilt.pending) return;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        tilt.pending = true;
+        DeviceOrientationEvent.requestPermission().then(function (r) {
+          tilt.pending = false;
+          tilt.settled = true;
+          if (r === 'granted') window.addEventListener('deviceorientation', onDeviceOrientation);
+        }).catch(function () { tilt.pending = false; });   // not a user gesture: try again on the next tap
+      } else {
+        tilt.settled = true;
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+      }
+    } catch (e) { tilt.settled = true; }
+  }
+
+  // Light direction for disc gloss and shadows (-1..1; default: from the upper left)
+  function lightVec() {
+    var on = Settings.bool('wood_tilt');
+    return {
+      x: Math.max(-1.2, Math.min(1.2, -0.55 + (on ? tilt.x : 0) * 0.8)),
+      y: Math.max(-1.2, Math.min(1.2, -0.65 + (on ? tilt.y : 0) * 0.8))
+    };
+  }
+
+  function triggerWinnerFx(w) {
+    if (!fx) return;
+    var shock = Settings.bool('fx_shockwave');
+    var glow = Settings.bool('fx_glow');
+    var n = Math.round(Settings.get('fx_particles'));
+    if (!shock && !glow && n <= 0) return;
+
+    var sp = Settings.bool('woodgrain_enabled') ? WoodGrain.SPECIES[w.discSpecies] : null;
+    var color = w.color, colA = w.color, colB = { r: 255, g: 255, b: 255 };
+    if (sp) {   // sawdust: the winning wood's light and dark tones
+      color = { r: sp.light[0], g: sp.light[1], b: sp.light[2] };
+      colA = color;
+      colB = { r: sp.dark[0], g: sp.dark[1], b: sp.dark[2] };
+    }
+    fx.trigger(w.x, w.y, {
+      color: color, colA: colA, colB: colB,
+      discR: Settings.get('radius') * 1.3,
+      shock: shock, glow: glow, particles: n
+    });
   }
 
   // --- Colours-mode background brightness ---
@@ -228,23 +286,6 @@
     if (Math.abs(target - bgMix) < 0.004) bgMix = target;
   }
 
-  // --- Winner flood layer (woodgrain): wood grows out of the winning disc ---
-  var floodState = '';
-
-  // Show the flood as a circle of radius R centred on (x, y), or hide it with null.
-  function setFlood(circle) {
-    var el = document.getElementById('wood-bg-winner');
-    if (!el) return;
-    var state = circle
-      ? 'circle(' + circle.r.toFixed(1) + 'px at ' + circle.x.toFixed(1) + 'px ' + circle.y.toFixed(1) + 'px)'
-      : '';
-    if (state === floodState) return;
-    floodState = state;
-    el.style.opacity = circle ? '1' : '0';
-    el.style.clipPath = state;
-    el.style.webkitClipPath = state;
-  }
-
   function reset() {
     fingers = {};
     fingerIds = [];
@@ -259,8 +300,7 @@
     // grain pattern each round (new seed → different pith position / ring phase)
     if (!Settings.bool('winner_bg_enabled')) bgSeed = Math.floor(Math.random() * 100000) + 1;
 
-    updateTabletopBackground();   // before hiding the flood, so there is no flash
-    setFlood(null);
+    if (fx) fx.stop();
     requestDraw();
   }
   function resolve(now) {
@@ -276,16 +316,13 @@
       var w = fingers[winnerId];
       if (w) {
         // The flood spreads over whatever background was showing, then the winner's
-        // colour becomes the background for the next round.
+        // colour / wood becomes the background for the next round.
         floodBase = currentBackgroundColor();
+        floodTableWood = currentTableWood();
         lastWinnerColor = w.color;
-        if (Settings.bool('winner_flood')) bgMix = 1;   // flood ends on the full colour; next round eases down to BG_DIM_LEVEL
         lastWinnerWood  = w.discSpecies;
-      }
-      var bgWinnerEl = document.getElementById('wood-bg-winner');
-      if (w && bgWinnerEl && Settings.bool('woodgrain_enabled')) {
-        // Same grain as the table, recoloured to the winning disc's wood
-        WoodGrain.renderBackground(bgWinnerEl, getBaseWoodTypeKey(), bgSeed, false, lastWinnerWood);
+        if (Settings.bool('winner_flood')) bgMix = 1;   // flood ends on the full colour; next round eases down to BG_DIM_LEVEL
+        triggerWinnerFx(w);
       }
 
       SoundManager.playWinner();
@@ -324,6 +361,26 @@
     }
   }
 
+  // Wood for a new disc: never the wood the table is showing, and never one that is
+  // already on screen until every other species has been used (then fewest repeats).
+  function pickDiscWood() {
+    var keys = WoodGrain.SPECIES_KEYS;
+    var tableWood = currentTableWood() || getBaseWoodTypeKey();
+    var used = {};
+    keys.forEach(function (k) { used[k] = 0; });
+    fingerIds.forEach(function (id) {
+      var f = fingers[id];
+      if (f && used[f.discSpecies] !== undefined) used[f.discSpecies]++;
+    });
+    var best = Infinity, pool = [];
+    keys.forEach(function (k) {
+      var score = used[k] + (k === tableWood ? 100 : 0);   // table wood only as a last resort
+      if (score < best) { best = score; pool = [k]; }
+      else if (score === best) pool.push(k);
+    });
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   function addFinger(id, x, y) {
     SoundManager.unlock();
     if (phase === 'RESULT') {
@@ -335,7 +392,7 @@
       reset();
     }
 
-    var discWood = WoodGrain.getRandomSpecies();
+    var discWood = pickDiscWood();
     var shadeShift = (Math.random() * 0.5 - 0.25);
     var seed = Math.floor(Math.random() * 100000);
     var color = palette.color(nextColorIndex++);
@@ -468,11 +525,12 @@
       // through when the puck is translucent. Shadow offsets/blur ignore the canvas
       // transform, hence the dpr scaling.
       var SHADOW_OFF = 10000;
+      var L = lightVec();   // shadow falls away from the light
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,' + (0.45 * alpha) + ')';
       ctx.shadowBlur = r * 0.35 * dpr;
-      ctx.shadowOffsetX = SHADOW_OFF * dpr;
-      ctx.shadowOffsetY = r * 0.12 * dpr;
+      ctx.shadowOffsetX = (SHADOW_OFF - L.x * r * 0.17) * dpr;
+      ctx.shadowOffsetY = (-L.y * r * 0.17) * dpr;
       ctx.fillStyle = '#000';
       ctx.beginPath();
       ctx.arc(x - SHADOW_OFF, y, r, 0, Math.PI * 2);
@@ -484,6 +542,30 @@
       ctx.globalAlpha = alpha;
       ctx.drawImage(fg.puckCanvas, x - r, y - r, r * 2, r * 2);
       ctx.restore();
+
+      // Live gloss: light/dark falloff across the face plus a specular hot spot that
+      // follows the light direction (which follows the device tilt)
+      var gloss = Settings.get('disc_gloss');
+      if (gloss > 0) {
+        var ga = gloss * alpha;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip();
+        var lg = ctx.createLinearGradient(x + L.x * r, y + L.y * r, x - L.x * r, y - L.y * r);
+        lg.addColorStop(0,   'rgba(255,255,255,' + (0.22 * ga).toFixed(3) + ')');
+        lg.addColorStop(0.5, 'rgba(255,255,255,0)');
+        lg.addColorStop(1,   'rgba(0,0,0,' + (0.18 * ga).toFixed(3) + ')');
+        ctx.fillStyle = lg;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        var hx = x + L.x * r * 0.5, hy = y + L.y * r * 0.5;
+        var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 0.55);
+        hg.addColorStop(0, 'rgba(255,255,255,' + (0.30 * ga).toFixed(3) + ')');
+        hg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = hg;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        ctx.restore();
+      }
     } else {
       ctx.save();
       ctx.fillStyle = rgbString(color, alpha);
@@ -660,58 +742,73 @@
 
     var woodgrainOn = Settings.bool('woodgrain_enabled');
     var bgEl = document.getElementById('wood-bg');
-    var bgWinnerEl = document.getElementById('wood-bg-winner');
     var winnerFg = fingers[winnerId];
+    var floodActive = phase === 'RESULT' && currentMode === MODES.FIRST &&
+                      Settings.bool('winner_flood') && !!winnerFg;
+    var feather = Settings.get('flood_feather');
+    var grow = 0, discR = 0, far = 0;
+    if (floodActive) {
+      var growS = Settings.get('winner_grow_ms') / 1000;
+      var e = (now - resultStart) / 1000;
+      var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
+      grow = 1 - Math.pow(1 - t, 3);
+      discR = Settings.get('radius') * (1 + 0.3 * grow);
+      far = Math.max(
+        Math.hypot(winnerFg.x, winnerFg.y),
+        Math.hypot(w - winnerFg.x, winnerFg.y),
+        Math.hypot(winnerFg.x, h - winnerFg.y),
+        Math.hypot(w - winnerFg.x, h - winnerFg.y)
+      ) + 2;
+    }
 
     if (woodgrainOn) {
       if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
-      if (bgWinnerEl && bgWinnerEl.style.display !== 'block') bgWinnerEl.style.display = 'block';
-
-      if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && winnerFg) {
-        var growS = Settings.get('winner_grow_ms') / 1000;
-        var e = (now - resultStart) / 1000;
-        var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
-        var grow = 1 - Math.pow(1 - t, 3);
-        // Wood spreads outward from the winning disc until it covers the screen
-        var discR = Settings.get('radius') * (1 + 0.3 * grow);
-        var far = Math.max(
-          Math.hypot(winnerFg.x, winnerFg.y),
-          Math.hypot(w - winnerFg.x, winnerFg.y),
-          Math.hypot(winnerFg.x, h - winnerFg.y),
-          Math.hypot(w - winnerFg.x, h - winnerFg.y)
-        ) + 2;
-        setFlood({ x: winnerFg.x, y: winnerFg.y, r: discR + (far - discR) * grow });
-      } else {
-        setFlood(null);
+      var tableWood = currentTableWood();
+      var flood = null;
+      if (floodActive) {
+        // Wood in the winner's species spreads out from the winning disc over the table
+        flood = {
+          x: winnerFg.x, y: winnerFg.y,
+          r: discR + (far + feather * 1.3 - discR) * grow,
+          feather: feather, ripple: Settings.get('wood_flood_ripple'), target: lastWinnerWood
+        };
+        tableWood = Settings.bool('winner_bg_enabled') ? floodTableWood : null;
       }
+      var tiltOn = Settings.bool('wood_tilt');
+      if (woodBg) woodBg.draw({
+        species: getBaseWoodTypeKey(), seed: bgSeed, table: tableWood, flood: flood,
+        time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
+        tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
+        sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
+      });
     } else {
       if (bgEl && bgEl.style.display !== 'none') bgEl.style.display = 'none';
-      if (bgWinnerEl && bgWinnerEl.style.display !== 'none') bgWinnerEl.style.display = 'none';
 
-      if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && winnerFg) {
-        var growS = Settings.get('winner_grow_ms') / 1000;
-        var e = (now - resultStart) / 1000;
-        var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
-        var grow = 1 - Math.pow(1 - t, 3);
+      if (floodActive) {
         // Winner colour spreads outward from the winning disc over the background
         ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
-        var discR2 = Settings.get('radius') * (1 + 0.3 * grow);
-        var far2 = Math.max(
-          Math.hypot(winnerFg.x, winnerFg.y),
-          Math.hypot(w - winnerFg.x, winnerFg.y),
-          Math.hypot(winnerFg.x, h - winnerFg.y),
-          Math.hypot(w - winnerFg.x, h - winnerFg.y)
-        ) + 2;
-        ctx.fillStyle = rgbString(winnerFg.color);
-        ctx.beginPath();
-        ctx.arc(winnerFg.x, winnerFg.y, discR2 + (far2 - discR2) * grow, 0, Math.PI * 2);
-        ctx.fill();
+        var Rc = discR + (far + feather - discR) * grow;
+        if (feather > 0) {
+          var rg = ctx.createRadialGradient(winnerFg.x, winnerFg.y, Math.max(0, Rc - feather),
+                                            winnerFg.x, winnerFg.y, Rc);
+          rg.addColorStop(0, rgbString(winnerFg.color, 1));
+          rg.addColorStop(1, rgbString(winnerFg.color, 0));
+          ctx.fillStyle = rg;
+          ctx.fillRect(0, 0, w, h);
+        } else {
+          ctx.fillStyle = rgbString(winnerFg.color);
+          ctx.beginPath();
+          ctx.arc(winnerFg.x, winnerFg.y, Rc, 0, Math.PI * 2);
+          ctx.fill();
+        }
       } else {
         ctx.fillStyle = rgbString(currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
       }
     }
+
+    if (fx) fx.draw(now);
 
     if (fingerIds.length === 0) {
       drawHint();
@@ -726,7 +823,7 @@
 
     ctx.restore();
 
-    var needsFrame = (fingerIds.length > 0) || (phase === 'RESULT' && now < animationEnd) || (bgMix !== bgMixTarget());
+    var needsFrame = (fingerIds.length > 0) || (phase === 'RESULT' && now < animationEnd) || (bgMix !== bgMixTarget()) || (fx && fx.isActive());
     if (needsFrame) {
       animFrameId = requestAnimationFrame(render);
     }
@@ -777,7 +874,7 @@
     content.appendChild(modeBox);
 
     // 2-7 Remaining Settings Groups
-    var groupOrder = ['WINNER', 'AUDIO', 'COLORS', 'APPEARANCE', 'TIMING', 'SYSTEM'];
+    var groupOrder = ['WOOD', 'WINNER', 'AUDIO', 'COLORS', 'APPEARANCE', 'TIMING', 'SYSTEM'];
 
     groupOrder.forEach(function (groupKey) {
       var groupItems = Settings.SCHEMA.filter(function (s) { return s.group === groupKey; });
@@ -913,7 +1010,18 @@
 
   // --- App Initialization ---
   function init() {
-    WoodGrain.setEngine(Settings.bool('wood_gl') ? 'gl' : 'cpu');
+    // GPU layers: live woodgrain table (#wood-bg) and winner effects (#fx)
+    var woodEl = document.getElementById('wood-bg');
+    if (woodEl) { woodBg = WoodGrain.createBackground(woodEl); woodBg.onRestore = requestDraw; }
+    var fxEl = document.getElementById('fx');
+    if (fxEl) { fx = WoodGrain.createEffects(fxEl); fx.onRestore = requestDraw; }
+
+    // Tilt lighting: iOS asks permission on the first tap, other browsers just start
+    window.addEventListener('touchend', requestTiltPermission, { passive: true });
+    window.addEventListener('click', requestTiltPermission, { passive: true });
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission !== 'function') requestTiltPermission();
+
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
@@ -1028,17 +1136,8 @@
       });
     }
 
-    // Render initial vector SVG tabletop background
-    updateTabletopBackground();
-
-    Settings.addChangeListener(function (s) {
-      if (!s || s.key === 'wood_gl') {
-        WoodGrain.setEngine(Settings.bool('wood_gl') ? 'gl' : 'cpu');
-      }
-      if (!s || s.key === 'wood_gl' || s.key === 'wood_type' || s.key === 'woodgrain_enabled' || s.key === 'winner_bg_enabled') {
-        updateTabletopBackground();
-      }
-    });
+    // Any setting change can affect the table, discs or effects: redraw
+    Settings.addChangeListener(function () { requestDraw(); });
 
     // Setup proactive Service Worker update checking
     setupServiceWorker();
