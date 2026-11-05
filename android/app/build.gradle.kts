@@ -67,11 +67,11 @@ tasks.register("generateLauncherIcons") {
             val g2 = img.createGraphics()
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-            // 1. Background: Walnut wood base color with grain lines
-            g2.color = Color(92, 64, 47)
+            // 1. Background: Purpleheart wood base color with grain lines
+            g2.color = Color(134, 72, 122)
             g2.fillRoundRect(0, 0, size, size, size / 4, size / 4)
 
-            g2.color = Color(46, 29, 20, 80)
+            g2.color = Color(60, 27, 58, 120)
             val strokeWidth = (size * 0.04f).coerceAtLeast(1f)
             g2.stroke = BasicStroke(strokeWidth)
             var y = -size
