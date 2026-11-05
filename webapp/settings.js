@@ -31,6 +31,7 @@
     { key: 'wood_tilt', group: 'WOOD', label: 'Tilt-driven lighting', def: 1, isBool: true },
     { key: 'disc_gloss', group: 'WOOD', label: 'Disc gloss', def: 0.8, min: 0, max: 1, step: 0.05 },
     { key: 'wood_flood_ripple', group: 'WOOD', label: 'Flood edge ripple', def: 0.4, min: 0, max: 1, step: 0.05 },
+    { key: 'flood_grain', group: 'WOOD', label: 'Flood edge follows new grain', def: 0.6, min: 0, max: 1, step: 0.05 },
 
     // Winner Options
     { key: 'winner_flood', group: 'WINNER', label: 'Winner floods the screen', def: 1, isBool: true },
@@ -41,6 +42,7 @@
     { key: 'marker_radius', group: 'WINNER', label: 'Marker ring size', def: 1.3, min: 1, max: 2, step: 0.05, unit: '×' },
     { key: 'marker_stroke', group: 'WINNER', label: 'Marker ring thickness', def: 8, min: 0, max: 20, step: 1, unit: 'dp' },
     { key: 'marker_dot', group: 'WINNER', label: 'Marker center dot size', def: 0.45, min: 0, max: 1, step: 0.05, unit: '×' },
+    { key: 'flood_ms', group: 'WINNER', label: 'Flood spread time', def: 1100, min: 0, max: 3000, step: 50, unit: 'ms' },
     { key: 'flood_feather', group: 'WINNER', label: 'Flood edge softness', def: 60, min: 0, max: 200, step: 5, unit: 'dp' },
     { key: 'fx_shockwave', group: 'WINNER', label: 'Winner shockwave ring', def: 0, isBool: true },
     { key: 'fx_glow', group: 'WINNER', label: 'Winner glow', def: 0, isBool: true },
@@ -333,7 +335,9 @@
     ['hint_enabled', 0, 1, 1],
     ['hint_size', 12, 40, 1],
     ['hint_opacity', 0, 1, 0.05],
-    ['winner_grow', 0, 1, 1]
+    ['winner_grow', 0, 1, 1],
+    ['flood_ms', 0, 3000, 50],
+    ['flood_grain', 0, 1, 0.05]
   ];
 
   function fieldCount(f) { return Math.round((f[2] - f[1]) / f[3]); }

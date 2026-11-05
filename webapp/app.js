@@ -90,7 +90,8 @@
 
   // --- Palette Class & Session Winner Tracking ---
   var lastWinnerColor   = null;   // palette colour (used by the colours-mode background)
-  var lastWinnerWood    = null;   // species key of the winning disc (the wood background is recoloured to it)
+  var lastWinnerWood    = null;   // species key of the winning disc (its grain becomes the next table)
+  var lastWinnerSeed    = 0;      // grain seed of that winning wood
 
   // Per-session background seed — randomised on first load and whenever the
   // species background changes so the grain pattern never looks identical.
@@ -181,12 +182,24 @@
   // --- Woodgrain table + winner effects (GPU layers, see woodgrain.js) ---
   var woodBg = null;            // live table layer
   var fx = null;                // winner effects layer (shockwave, glow, particles)
-  var floodTableWood = null;    // wood the table showed when the current flood started
+  var floodTable = null;        // { species, seed } the table showed when the current flood started
+  var floodGrain = null;        // { species, seed } the winner's own grain, spreading over it
 
-  // Wood the table is recoloured to right now (the previous winner's), or null = natural
+  // Wood species the table is showing right now (the previous winner's), or null = the base wood
   function currentTableWood() {
     return (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
   }
+
+  // The table's actual grain: species + seed. After a round it IS the winner's grain.
+  function currentTableGrain() {
+    if (Settings.bool('winner_bg_enabled') && lastWinnerWood) {
+      return { species: lastWinnerWood, seed: lastWinnerSeed };
+    }
+    return { species: getBaseWoodTypeKey(), seed: bgSeed };
+  }
+
+  // Ease-out used by the disc grow and the flood spread
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
   // --- Device tilt: moves the sheen, the disc gloss and the disc shadows ---
   var tilt = { x: 0, y: 0, settled: false, pending: false };
@@ -316,16 +329,20 @@
     if (currentMode === MODES.FIRST) {
       winnerId = ids[Math.floor(Math.random() * ids.length)];
       var growMs = winnerGrowMs();
-      animationEnd = now + Math.max(growMs, 800);
+      animationEnd = now + Math.max(growMs, Settings.get('flood_ms'), 800);
 
       var w = fingers[winnerId];
       if (w) {
         // The flood spreads over whatever background was showing, then the winner's
         // colour / wood becomes the background for the next round.
         floodBase = currentBackgroundColor();
-        floodTableWood = currentTableWood();
+        floodTable = currentTableGrain();
+        // The winner's wood gets a fresh grain of its own; it spreads over the table
+        // now and is the table in the next round.
+        floodGrain = { species: w.discSpecies, seed: Math.floor(Math.random() * 100000) + 1 };
         lastWinnerColor = w.color;
-        lastWinnerWood  = w.discSpecies;
+        lastWinnerWood  = floodGrain.species;
+        lastWinnerSeed  = floodGrain.seed;
         if (Settings.bool('winner_flood')) bgMix = 1;   // flood ends on the full colour; next round eases down to BG_DIM_LEVEL
         triggerWinnerFx(w);
       }
@@ -758,12 +775,14 @@
     var floodActive = phase === 'RESULT' && currentMode === MODES.FIRST &&
                       Settings.bool('winner_flood') && !!winnerFg;
     var feather = Settings.get('flood_feather');
-    var grow = 0, discR = 0, far = 0;
+    var grow = 0, spread = 0, discR = 0, far = 0;
     if (floodActive) {
-      var growS = winnerGrowMs() / 1000;
       var e = (now - resultStart) / 1000;
-      var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
-      grow = 1 - Math.pow(1 - t, 3);
+      // The disc grows on its own clock; the flood spreads on its own
+      var growS = winnerGrowMs() / 1000;
+      grow = easeOut((growS <= 0) ? 1 : Math.min(1, e / growS));
+      var spreadS = Settings.get('flood_ms') / 1000;
+      spread = easeOut((spreadS <= 0) ? 1 : Math.min(1, e / spreadS));
       discR = Settings.get('radius') * (1 + 0.3 * grow);
       far = Math.max(
         Math.hypot(winnerFg.x, winnerFg.y),
@@ -775,20 +794,23 @@
 
     if (woodgrainOn) {
       if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
-      var tableWood = currentTableWood();
+      var tableGrain = currentTableGrain();
       var flood = null;
-      if (floodActive) {
-        // Wood in the winner's species spreads out from the winning disc over the table
+      if (floodActive && floodTable && floodGrain) {
+        // The winner's own grain spreads out from the winning disc over the table
+        var grainEdge = Settings.get('flood_grain');
+        tableGrain = floodTable;
         flood = {
           x: winnerFg.x, y: winnerFg.y,
-          r: discR + (far + feather * 1.3 - discR) * grow,
-          feather: feather, ripple: Settings.get('wood_flood_ripple'), target: lastWinnerWood
+          // ends far enough out that the grain-bent front still clears every corner
+          r: discR + (far + feather * (1.3 + 1.25 * grainEdge) - discR) * spread,
+          feather: feather, ripple: Settings.get('wood_flood_ripple'), grain: grainEdge,
+          species: floodGrain.species, seed: floodGrain.seed
         };
-        tableWood = Settings.bool('winner_bg_enabled') ? floodTableWood : null;
       }
       var tiltOn = Settings.bool('wood_tilt');
       if (woodBg) woodBg.draw({
-        species: getBaseWoodTypeKey(), seed: bgSeed, table: tableWood, flood: flood,
+        species: tableGrain.species, seed: tableGrain.seed, table: null, flood: flood,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
         tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
         sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
@@ -800,7 +822,7 @@
         // Winner colour spreads outward from the winning disc over the background
         ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
-        var Rc = discR + (far + feather - discR) * grow;
+        var Rc = discR + (far + feather - discR) * spread;
         if (feather > 0) {
           var rg = ctx.createRadialGradient(winnerFg.x, winnerFg.y, Math.max(0, Rc - feather),
                                             winnerFg.x, winnerFg.y, Rc);
