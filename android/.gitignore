@@ -1,0 +1,32 @@
+# Built application files & Gradle outputs
+*.apk
+*.aab
+*.aar
+*.dex
+*.class
+
+# Build & Intermediate Directories
+build/
+.gradle/
+buildOutputCleanup/
+.kotlin/
+generated/
+intermediates/
+outputs/
+tmp/
+
+# IDE / Android Studio / IntelliJ files
+.idea/caches/
+.idea/libraries/
+.idea/workspace.xml
+local.properties
+gradle/gradle-daemon-jvm.properties
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

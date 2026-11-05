@@ -1,0 +1,42 @@
+# Built application files & Gradle outputs
+*.apk
+*.aab
+*.aar
+*.dex
+*.class
+
+# Build & Intermediate Directories
+**/build/
+**/.gradle/
+**/buildOutputCleanup/
+**/.kotlin/
+**/generated/
+**/intermediates/
+**/outputs/
+**/tmp/
+**/symbol_list_with_package_name/
+
+# IDE / Android Studio / IntelliJ files
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navTree.xml
+.idea/assetStudio.xml
+.idea/deploymentTargetSelector.xml
+.idea/deviceManager.xml
+.idea/migration.xml
+*.iml
+*.iws
+*.ipr
+local.properties
+gradle/gradle-daemon-jvm.properties
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

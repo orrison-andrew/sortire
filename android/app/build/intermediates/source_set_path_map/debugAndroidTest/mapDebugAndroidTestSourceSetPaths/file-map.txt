@@ -1,4 +1,0 @@
-com.camelot.merlin.sortire.test.app-androidTest-0 /Users/andrew.orrison/Documents/github-repos/sortire/android/app/build/generated/res/resValues/androidTest/debug
-com.camelot.merlin.sortire.test.app-mergeDebugAndroidTestResources-1 /Users/andrew.orrison/Documents/github-repos/sortire/android/app/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/merged.dir
-com.camelot.merlin.sortire.test.app-mergeDebugAndroidTestResources-2 /Users/andrew.orrison/Documents/github-repos/sortire/android/app/build/intermediates/incremental/debugAndroidTest/mergeDebugAndroidTestResources/stripped.dir
-com.camelot.merlin.sortire.test.app-debugAndroidTest-3 /Users/andrew.orrison/Documents/github-repos/sortire/android/app/build/intermediates/merged_res/debugAndroidTest/mergeDebugAndroidTestResources

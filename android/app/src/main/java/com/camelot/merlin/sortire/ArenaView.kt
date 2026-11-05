@@ -12,12 +12,12 @@ import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.random.Random
 
 /**
  * Full-screen multi-touch surface. All look/feel values come from [Settings] and are read live,
@@ -25,9 +25,16 @@ import kotlin.math.sin
  */
 class ArenaView(context: Context) : View(context) {
 
-    private inner class Finger(var x: Float, var y: Float, val color: Int, val discWoodType: WoodType, seed: Long) {
+    private inner class Finger(
+        var x: Float,
+        var y: Float,
+        val color: Int,
+        val discWoodType: WoodType,
+        seed: Long,
+        shadeShift: Float
+    ) {
         var down = true
-        val puckBitmap: Bitmap = WoodgrainEngine.getWoodDiscBitmap((baseRadius * 2f).roundToInt(), discWoodType, seed)
+        val puckBitmap: Bitmap = WoodgrainEngine.getWoodDiscBitmap((baseRadius * 2f).roundToInt(), discWoodType, seed, shadeShift)
     }
 
     private enum class Phase { WAITING, COUNTING, RESULT }
@@ -77,7 +84,6 @@ class ArenaView(context: Context) : View(context) {
     }
     private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.WHITE
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val arcRect = RectF()
@@ -121,8 +127,9 @@ class ArenaView(context: Context) : View(context) {
         }
         val woodTypes = WoodType.values()
         val discWood = woodTypes.random()
-        val randomSeed = kotlin.random.Random.nextLong()
-        fingers[id] = Finger(x, y, palette.color(nextColorIndex++), discWood, randomSeed)
+        val shadeShift = (Random.nextFloat() * 0.5f - 0.25f)
+        val randomSeed = Random.nextLong()
+        fingers[id] = Finger(x, y, palette.color(nextColorIndex++), discWood, randomSeed, shadeShift)
         haptic(Haptic.TAP)
         SoundManager.playPop()
         restartCountdown()
@@ -346,6 +353,22 @@ class ArenaView(context: Context) : View(context) {
         }
     }
 
+    private fun getAdaptiveMarkerColor(circleColor: Int): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(circleColor, hsv)
+        val sat = hsv[1]
+        val v = hsv[2]
+
+        if (v > 0.65f) {
+            hsv[1] = (sat * 1.3f).coerceIn(0f, 1f)
+            hsv[2] = (v * 0.35f).coerceIn(0f, 1f)
+        } else {
+            hsv[1] = (sat * 0.35f).coerceIn(0f, 1f)
+            hsv[2] = min(1f, v * 1.6f + 0.25f)
+        }
+        return Color.HSVToColor(hsv)
+    }
+
     private fun drawWinner(c: Canvas, now: Long) {
         val e = (now - resultStart) / 1000f
         val fadeS = f(Setting.WINNER_FADE_MS) / 1000f
@@ -360,27 +383,19 @@ class ArenaView(context: Context) : View(context) {
         val radius = baseRadius * (1f + 0.3f * grow)
         circle(c, w, w.x, w.y, radius, w.color)
 
-        // White marker so you can see exactly who was picked (toggleable in Settings).
+        // Adaptive marker ring & center dot (never jarring white)
         if (on(Setting.MARKER_ENABLED)) {
+            val markerColor = getAdaptiveMarkerColor(w.color)
             val stroke = f(Setting.MARKER_STROKE) * density
             if (stroke > 0f) {
                 markerPaint.strokeWidth = stroke
+                markerPaint.color = markerColor
                 c.drawCircle(w.x, w.y, baseRadius * f(Setting.MARKER_RADIUS), markerPaint)
             }
             paint.style = Paint.Style.FILL
-            paint.color = Color.WHITE
+            paint.color = markerColor
             c.drawCircle(w.x, w.y, baseRadius * f(Setting.MARKER_DOT) * grow, paint)
         }
-    }
-
-    private fun blendColors(color1: Int, color2: Int, ratio: Float): Int {
-        val r = ratio.coerceIn(0f, 1f)
-        val ir = 1f - r
-        val a = Color.alpha(color1) * ir + Color.alpha(color2) * r
-        val red = Color.red(color1) * ir + Color.red(color2) * r
-        val green = Color.green(color1) * ir + Color.green(color2) * r
-        val blue = Color.blue(color1) * ir + Color.blue(color2) * r
-        return Color.argb(a.toInt(), red.toInt(), green.toInt(), blue.toInt())
     }
 
     private fun drawRanking(c: Canvas, now: Long) {
@@ -404,6 +419,16 @@ class ArenaView(context: Context) : View(context) {
                 circle(c, fg, fg.x, fg.y, r, fg.color, f(Setting.ORDER_PENDING_ALPHA))
             }
         }
+    }
+
+    private fun blendColors(color1: Int, color2: Int, ratio: Float): Int {
+        val r = ratio.coerceIn(0f, 1f)
+        val ir = 1f - r
+        val a = Color.alpha(color1) * ir + Color.alpha(color2) * r
+        val red = Color.red(color1) * ir + Color.red(color2) * r
+        val green = Color.green(color1) * ir + Color.green(color2) * r
+        val blue = Color.blue(color1) * ir + Color.blue(color2) * r
+        return Color.argb(a.toInt(), red.toInt(), green.toInt(), blue.toInt())
     }
 
     private fun drawHint(c: Canvas) {
