@@ -186,19 +186,35 @@
   // Shorter axis = 1206 px → scale = 1206/2048 = 0.59× — both are within comfortable range.
   // Canvas bicubic interpolation makes 1.28× nearly invisible at 460 PPI.
   var bgTexCache = {};
+  var bgTexOrder = [];            // keys, oldest first
+  var BG_CACHE_MAX = 4;           // 2048² RGBA ≈ 16 MB each — cap so memory can't grow forever
 
   /**
    * Returns (and caches) a 2048 px master texture for backgrounds.
+   * The texture is always the full-brightness version; the muted winner-bg look
+   * is applied at draw time by renderBackground, so the flood and the following
+   * round's background share one texture instead of generating it twice.
    * @param {string}  speciesKey
    * @param {number}  seed        Controls pith/ring layout variety between sessions
-   * @param {boolean} isMuted     Muted winner-bg variant
    */
-  function getMasterTexture(speciesKey, seed, isMuted) {
+  function getMasterTexture(speciesKey, seed) {
     speciesKey = speciesKey || 'walnut';
     seed = (seed || 42) | 0;
-    var key = speciesKey + '_' + seed + (isMuted ? '_m' : '');
-    if (!bgTexCache[key]) {
-      bgTexCache[key] = generate(speciesKey, BG_SIZE, seed, isMuted);
+    var key = speciesKey + '_' + seed;
+    if (bgTexCache[key]) {
+      // refresh recency
+      var i = bgTexOrder.indexOf(key);
+      if (i !== -1) bgTexOrder.splice(i, 1);
+      bgTexOrder.push(key);
+      return bgTexCache[key];
+    }
+    bgTexCache[key] = generate(speciesKey, BG_SIZE, seed, false);
+    bgTexOrder.push(key);
+    while (bgTexOrder.length > BG_CACHE_MAX) {
+      var old = bgTexOrder.shift();
+      var oc = bgTexCache[old];
+      if (oc) { oc.width = oc.height = 0; }   // release the bitmap memory
+      delete bgTexCache[old];
     }
     return bgTexCache[key];
   }
@@ -209,7 +225,7 @@
   /**
    * Pre-renders a wooden disc canvas.
    * Crops a randomly rotated patch from the shared 1024 px species atlas and
-   * composites shadow / edge shading / specular highlight / bevel on top.
+   * composites edge shading / specular highlight / bevel on top.
    *
    * @param {number} diameter   Physical px size (pass baseRadius × 2 × dpr × 1.5 from app.js)
    * @param {string} species    Species key
@@ -237,18 +253,11 @@
     var ctx = c.getContext('2d');
     var r   = diameter / 2;
 
-    // ── 1. Drop shadow ────────────────────────────────────────────────────
-    ctx.save();
-    ctx.shadowColor   = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur    = r * 0.35;
-    ctx.shadowOffsetY = r * 0.12;
-    ctx.fillStyle     = '#000';
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
-    ctx.fill();
-    ctx.restore();
+    // NOTE: no drop shadow is baked in here. The disc fills the whole canvas, so any
+    // shadow drawn into it gets clipped at the canvas edge and shows up as a faint
+    // square around the disc. app.js draws the shadow live on the main canvas instead.
 
-    // ── 2. Wood face: random crop + rotation from shared species atlas ────
+    // ── 1. Wood face: random crop + rotation from shared species atlas ────
     // Crop a 55% window (560 px of 1024) so we can randomise the patch origin
     // while keeping plenty of grain detail even after downscaling to the disc.
     ctx.save();
@@ -263,7 +272,7 @@
     ctx.drawImage(tex, ox, oy, sw, sw, -r, -r, 2 * r, 2 * r);
     ctx.restore();
 
-    // ── 3. Optional shade shift (per-disc darkness/lightness variance) ────
+    // ── 2. Optional shade shift (per-disc darkness/lightness variance) ────
     if (shadeShift !== 0) {
       ctx.save();
       ctx.beginPath();
@@ -278,7 +287,7 @@
       ctx.restore();
     }
 
-    // ── 4. Edge shading (radial darkening toward rim — 3-D depth cue) ────
+    // ── 3. Edge shading (radial darkening toward rim — 3-D depth cue) ────
     ctx.save();
     ctx.beginPath();
     ctx.arc(r, r, r, 0, TAU);
@@ -290,7 +299,7 @@
     ctx.fillRect(0, 0, diameter, diameter);
     ctx.restore();
 
-    // ── 5. Specular highlight (top-left lit, bottom-right shadowed) ───────
+    // ── 4. Specular highlight (top-left lit, bottom-right shadowed) ───────
     ctx.save();
     ctx.beginPath();
     ctx.arc(r, r, r, 0, TAU);
@@ -303,14 +312,14 @@
     ctx.fillRect(0, 0, diameter, diameter);
     ctx.restore();
 
-    // ── 6. Rim stroke ─────────────────────────────────────────────────────
+    // ── 5. Rim stroke ─────────────────────────────────────────────────────
     ctx.lineWidth   = r * 0.05;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
     ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
     ctx.stroke();
 
-    // ── 7. Bevel highlight ────────────────────────────────────────────────
+    // ── 6. Bevel highlight ────────────────────────────────────────────────
     ctx.lineWidth   = r * 0.03;
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
@@ -366,7 +375,7 @@
     ctx.imageSmoothingEnabled  = true;
     ctx.imageSmoothingQuality  = 'high';
 
-    var tex = getMasterTexture(speciesKey, seed, isMuted);
+    var tex = getMasterTexture(speciesKey, seed);
 
     // ── Cover-fit: scale texture uniformly so it fills the physical canvas ──
     // This matches CSS `background-size: cover` behaviour.  One axis will be
@@ -380,6 +389,16 @@
     var dy     = (ph - dh) / 2;
 
     ctx.drawImage(tex, dx, dy, dw, dh);
+
+    // Muted variant (previous-winner background): same factors the old baked-in
+    // version used (0.72 / 0.70 / 0.74), applied as a multiply overlay.
+    if (isMuted) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgb(184,179,189)';
+      ctx.fillRect(0, 0, pw, ph);
+      ctx.restore();
+    }
 
     // ── Vignette: subtle radial darkening toward the edges (table-depth cue) ─
     var vig = ctx.createRadialGradient(

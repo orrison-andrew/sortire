@@ -90,6 +90,7 @@
 
   // --- Palette Class & Session Winner Tracking ---
   var lastWinnerSpecies = null;
+  var lastWinnerSeed    = null;
   var lastWinnerColor   = null;
 
   // Per-session background seed — randomised on first load and whenever the
@@ -189,7 +190,8 @@
     // winner_bg_enabled ON + a previous winner exists → use their species (muted)
     // winner_bg_enabled OFF (or no previous winner)   → use the chosen species + fresh seed
     if (Settings.bool('winner_bg_enabled') && lastWinnerSpecies) {
-      WoodGrain.renderBackground(bgEl, lastWinnerSpecies, bgSeed, /*isMuted=*/true);
+      // Same species + seed the winner flood used, so the grain carries over
+      WoodGrain.renderBackground(bgEl, lastWinnerSpecies, lastWinnerSeed, /*isMuted=*/true);
     } else {
       WoodGrain.renderBackground(bgEl, getBaseWoodTypeKey(), bgSeed, /*isMuted=*/false);
     }
@@ -225,6 +227,12 @@
       animationEnd = now + Math.max(growMs, 800);
 
       var w = fingers[winnerId];
+      if (w) {
+        // Remember the winner so the next round's background can match it
+        lastWinnerSpecies = w.discSpecies;
+        lastWinnerSeed    = w.seed;
+        lastWinnerColor   = w.color;
+      }
       var bgWinnerEl = document.getElementById('wood-bg-winner');
       if (w && bgWinnerEl && Settings.bool('woodgrain_enabled')) {
         WoodGrain.renderBackground(bgWinnerEl, w.discSpecies, w.seed);
@@ -405,14 +413,19 @@
     var woodgrainOn = Settings.bool('woodgrain_enabled');
 
     if (woodgrainOn && fg && fg.puckCanvas) {
-      // Drop shadow behind wooden puck
+      // Drop shadow behind wooden puck. The shadow-casting disc is drawn far off-screen
+      // and only its shadow is offset back into view, so no opaque black disc shows
+      // through when the puck is translucent. Shadow offsets/blur ignore the canvas
+      // transform, hence the dpr scaling.
+      var SHADOW_OFF = 10000;
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,' + (0.45 * alpha) + ')';
-      ctx.shadowBlur = r * 0.35;
-      ctx.shadowOffsetY = r * 0.12;
+      ctx.shadowBlur = r * 0.35 * dpr;
+      ctx.shadowOffsetX = SHADOW_OFF * dpr;
+      ctx.shadowOffsetY = r * 0.12 * dpr;
       ctx.fillStyle = '#000';
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(x - SHADOW_OFF, y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -940,7 +953,7 @@
     updateTabletopBackground();
 
     Settings.addChangeListener(function (s) {
-      if (!s || s.key === 'wood_type' || s.key === 'woodgrain_enabled') {
+      if (!s || s.key === 'wood_type' || s.key === 'woodgrain_enabled' || s.key === 'winner_bg_enabled') {
         updateTabletopBackground();
       }
     });
