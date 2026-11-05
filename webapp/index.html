@@ -20,6 +20,7 @@
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="codes.css">
 </head>
 <body>
   <!-- GPU woodgrain tabletop (WebGL canvas is created inside by woodgrain.js) -->
@@ -30,7 +31,7 @@
   <!-- GPU winner effects (shockwave, glow, particles) -->
   <canvas id="fx" aria-hidden="true"></canvas>
 
-  <!-- Top-Right Settings Gear Icon -->
+  <!-- Top-Right Settings Gear Icon (tap again to close the drawer) -->
   <button id="tune-btn" type="button" aria-label="Settings">⚙</button>
 
   <!-- Update Ready Toast Pill -->
@@ -54,11 +55,11 @@
     <div id="tuning-content"></div>
   </div>
 
-  <!-- Import JSON Modal -->
+  <!-- Import Modal: settings code (or JSON) -->
   <div id="import-modal" class="modal-backdrop">
     <div class="modal-box">
-      <h3>Import Settings JSON</h3>
-      <textarea id="import-json-text" placeholder='{"countdown_ms": 2000, "radius": 60, ...}'></textarea>
+      <h3>Import Settings</h3>
+      <textarea id="import-json-text" placeholder="Paste a settings code (01341B95…) or a JSON block"></textarea>
       <div class="modal-actions">
         <button id="import-cancel" class="panel-btn" type="button">Cancel</button>
         <button id="import-submit" class="panel-btn done" type="button">Apply</button>

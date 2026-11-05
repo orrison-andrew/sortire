@@ -19,14 +19,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Build and deploy are separate jobs on purpose. With upload + deploy in one job,
+  # deploy-pages can fail with: No artifacts named "github-pages" were found.
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Check the site folder
+        run: |
+          test -f webapp/index.html || { echo "webapp/index.html is missing"; exit 1; }
+          ls -R webapp
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -36,6 +40,13 @@ jobs:
         with:
           path: "webapp"
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

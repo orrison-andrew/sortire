@@ -1,8 +1,11 @@
-const CACHE_NAME = 'sortire-pwa-v8';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'sortire-pwa-v11';
+
+// The app can't start without these: if one is missing, install fails loudly.
+const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
+  './codes.css',
   './woodgrain.js',
   './sound.js',
   './settings.js',
@@ -14,10 +17,17 @@ const ASSETS_TO_CACHE = [
   './icons/icon.svg'
 ];
 
+// Nice to have. A missing file here must never break installing the app.
+const OPTIONAL_ASSETS = [
+  './codes.txt'
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(CORE_ASSETS).then(() =>
+        Promise.all(OPTIONAL_ASSETS.map((url) => cache.add(url).catch(() => {})))
+      );
     }).then(() => self.skipWaiting())
   );
 });

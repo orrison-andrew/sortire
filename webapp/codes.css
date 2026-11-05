@@ -1,0 +1,76 @@
+/* Share & Saved Tunings section of the settings panel */
+.code-section {
+  padding: 12px 14px;
+}
+
+.code-box {
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.code-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.code-btn-row .panel-btn {
+  padding: 8px 14px;
+  font-size: 12.5px;
+}
+
+.saved-list {
+  margin-top: 6px;
+}
+
+.saved-empty {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 8px 2px 2px;
+}
+
+.saved-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.saved-row:first-child {
+  border-top: none;
+}
+
+.saved-name {
+  flex: 1;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  color: #FFF;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-name:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* The saved tuning that matches the current settings exactly */
+.saved-name.active {
+  border-color: #A370F7;
+}

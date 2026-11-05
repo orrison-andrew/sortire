@@ -270,6 +270,11 @@
     return blendColors(palette.background, brightBackground(), bgMix);
   }
 
+  // Winner grow time in ms. The "Winner grows" switch off means instant (0).
+  function winnerGrowMs() {
+    return Settings.bool('winner_grow') ? Settings.get('winner_grow_ms') : 0;
+  }
+
   function bgMixTarget() {
     // The flood holds the full winner colour while the result is showing
     var w = fingers[winnerId];
@@ -310,7 +315,7 @@
 
     if (currentMode === MODES.FIRST) {
       winnerId = ids[Math.floor(Math.random() * ids.length)];
-      var growMs = Settings.get('winner_grow_ms');
+      var growMs = winnerGrowMs();
       animationEnd = now + Math.max(growMs, 800);
 
       var w = fingers[winnerId];
@@ -381,7 +386,10 @@
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
+  // Finger ids are always strings: touch identifiers are numbers, but object keys
+  // (for..in) and ranking/winnerId lookups need one consistent type.
   function addFinger(id, x, y) {
+    id = String(id);
     SoundManager.unlock();
     if (phase === 'RESULT') {
       var anyDown = false;
@@ -407,6 +415,7 @@
   }
 
   function liftFinger(id) {
+    id = String(id);
     var fg = fingers[id];
     if (!fg || !fg.down) return;
     if (Settings.bool('sound_enabled')) {
@@ -425,6 +434,7 @@
   }
 
   function moveFinger(id, x, y) {
+    id = String(id);
     var fg = fingers[id];
     if (fg && fg.down) {
       fg.x = x;
@@ -582,6 +592,7 @@
     var pulseAmount = Settings.get('pulse_amount');
     var pulseSpeed = Settings.get('pulse_speed');
     var baseRadius = Settings.get('radius');
+    var woodgrainOn = Settings.bool('woodgrain_enabled');
     var showRing = (phase === 'COUNTING') && Settings.bool('ring_enabled');
     var ringOffset = Settings.get('ring_offset');
     var ringStroke = Settings.get('ring_stroke');
@@ -597,7 +608,8 @@
         var rr = r + ringOffset;
         ctx.save();
         ctx.lineWidth = ringStroke;
-        ctx.strokeStyle = 'rgba(255,255,255,' + ringOpacity + ')';
+        ctx.strokeStyle = woodgrainOn ? 'rgba(255,255,255,' + ringOpacity + ')'
+                                      : rgbString(fg.color, ringOpacity);
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.arc(fg.x, fg.y, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
@@ -611,7 +623,7 @@
   function drawWinner(now) {
     var baseRadius = Settings.get('radius');
     var fadeS = Settings.get('winner_fade_ms') / 1000;
-    var growS = Settings.get('winner_grow_ms') / 1000;
+    var growS = winnerGrowMs() / 1000;
     var e = (now - resultStart) / 1000;
     var fade = (fadeS <= 0) ? 0 : Math.max(0, 1 - e / fadeS);
 
@@ -748,7 +760,7 @@
     var feather = Settings.get('flood_feather');
     var grow = 0, discR = 0, far = 0;
     if (floodActive) {
-      var growS = Settings.get('winner_grow_ms') / 1000;
+      var growS = winnerGrowMs() / 1000;
       var e = (now - resultStart) / 1000;
       var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
       grow = 1 - Math.pow(1 - t, 3);
@@ -843,6 +855,189 @@
     buildTuningPanel();
   }
 
+  // --- Settings codes UI ---------------------------------------------------
+  var communityCodes = [];
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function copyText(text, btn, label) {
+    function done() {
+      if (!btn) return;
+      btn.textContent = 'Copied!';
+      setTimeout(function () { btn.textContent = label; }, 1500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+    } else {
+      fallbackCopy(text);
+      done();
+    }
+  }
+
+  // Display only: groups of 4 so the code is easier to read and compare
+  function formatCode(code) { return code.replace(/(.{4})(?=.)/g, '$1 '); }
+
+  function updateCodeBox() {
+    var el = document.getElementById('code-box');
+    if (el) el.textContent = formatCode(Settings.currentCode());
+  }
+
+  function applyCodeAndRefresh(code) {
+    var r = Settings.applyCode(code);
+    if (!r.ok) { alert(r.error); return false; }
+    buildTuningPanel();
+    reset();
+    return true;
+  }
+
+  // Optional plain list of codes in codes.txt (one per line). Used by Shuffle.
+  function loadCommunityCodes() {
+    if (!window.fetch) return;
+    fetch('codes.txt', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (t) {
+        communityCodes = t.split(/\r?\n/)
+          .map(function (l) { return l.trim(); })
+          .filter(function (l) { return l && l.charAt(0) !== '#' && Settings.decode(l).ok; });
+        var b = document.getElementById('code-shuffle');
+        if (b) b.style.display = communityCodes.length ? '' : 'none';
+      })
+      .catch(function () {});
+  }
+
+  function renderSavedList(wrap) {
+    wrap.innerHTML = '';
+    var list = Settings.listSaved();
+    if (!list.length) {
+      var empty = document.createElement('div');
+      empty.className = 'saved-empty';
+      empty.textContent = 'Tunings you save will show up here.';
+      wrap.appendChild(empty);
+      return;
+    }
+    var current = Settings.currentCode();
+    list.forEach(function (entry) {
+      var row = document.createElement('div');
+      row.className = 'saved-row';
+
+      var nameBtn = document.createElement('button');
+      nameBtn.type = 'button';
+      nameBtn.className = 'saved-name' + (entry.code === current ? ' active' : '');
+      nameBtn.textContent = entry.name;
+      nameBtn.title = 'Apply this tuning';
+      nameBtn.addEventListener('click', function () {
+        SoundManager.playClick();
+        applyCodeAndRefresh(entry.code);
+      });
+
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'tune-mini-btn';
+      editBtn.textContent = '✎';
+      editBtn.title = 'Rename';
+      editBtn.addEventListener('click', function () {
+        var n = prompt('Rename tuning:', entry.name);
+        if (n === null) return;
+        Settings.renameSaved(entry.id, n);
+        renderSavedList(wrap);
+      });
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'tune-mini-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Delete';
+      delBtn.addEventListener('click', function () {
+        if (!confirm('Delete "' + entry.name + '"?')) return;
+        Settings.deleteSaved(entry.id);
+        renderSavedList(wrap);
+      });
+
+      row.appendChild(nameBtn);
+      row.appendChild(editBtn);
+      row.appendChild(delBtn);
+      wrap.appendChild(row);
+    });
+  }
+
+  function buildCodesSection(content) {
+    var title = document.createElement('div');
+    title.className = 'panel-group-title';
+    title.textContent = 'Share & Saved Tunings';
+    content.appendChild(title);
+
+    var box = document.createElement('div');
+    box.className = 'panel-group code-section';
+
+    var codeEl = document.createElement('div');
+    codeEl.id = 'code-box';
+    codeEl.className = 'code-box';
+    codeEl.textContent = formatCode(Settings.currentCode());
+    box.appendChild(codeEl);
+
+    var btnRow = document.createElement('div');
+    btnRow.className = 'code-btn-row';
+
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'panel-btn';
+    copyBtn.textContent = 'Copy code';
+    copyBtn.addEventListener('click', function () {
+      SoundManager.playClick();
+      copyText(Settings.currentCode(), copyBtn, 'Copy code');
+    });
+    codeEl.addEventListener('click', function () { copyText(Settings.currentCode(), null, ''); });
+
+    var savedWrap = document.createElement('div');
+    savedWrap.className = 'saved-list';
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'panel-btn done';
+    saveBtn.textContent = 'Save this tuning';
+    saveBtn.addEventListener('click', function () {
+      SoundManager.playClick();
+      var name = prompt('Name this tuning:', 'Tuning ' + (Settings.listSaved().length + 1));
+      if (name === null) return;
+      var r = Settings.saveCode(name, Settings.currentCode());
+      if (!r.ok) { alert(r.error); return; }
+      renderSavedList(savedWrap);
+    });
+
+    var shuffleBtn = document.createElement('button');
+    shuffleBtn.type = 'button';
+    shuffleBtn.id = 'code-shuffle';
+    shuffleBtn.className = 'panel-btn';
+    shuffleBtn.textContent = 'Shuffle';
+    shuffleBtn.title = 'Try a random tuning from the shared list';
+    shuffleBtn.style.display = communityCodes.length ? '' : 'none';
+    shuffleBtn.addEventListener('click', function () {
+      SoundManager.playClick();
+      var cur = Settings.currentCode();
+      var pool = communityCodes.filter(function (c) { return c.toUpperCase() !== cur; });
+      if (!pool.length) return;
+      applyCodeAndRefresh(pool[Math.floor(Math.random() * pool.length)]);
+    });
+
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(copyBtn);
+    btnRow.appendChild(shuffleBtn);
+    box.appendChild(btnRow);
+
+    renderSavedList(savedWrap);
+    box.appendChild(savedWrap);
+    content.appendChild(box);
+  }
+
   // --- Tuning Panel Builder ---
   function buildTuningPanel() {
     var content = document.getElementById('tuning-content');
@@ -872,6 +1067,9 @@
       })(MODES[mKey]);
     }
     content.appendChild(modeBox);
+
+    // Share / saved tunings (settings codes)
+    buildCodesSection(content);
 
     // 2-7 Remaining Settings Groups
     var groupOrder = ['WOOD', 'WINNER', 'AUDIO', 'COLORS', 'APPEARANCE', 'TIMING', 'SYSTEM'];
@@ -1059,8 +1257,12 @@
       tuneBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         SoundManager.playClick();
-        buildTuningPanel();
-        panel.classList.add('visible');
+        if (panel.classList.contains('visible')) {
+          panel.classList.remove('visible');
+        } else {
+          buildTuningPanel();
+          panel.classList.add('visible');
+        }
       });
     }
 
@@ -1125,19 +1327,30 @@
     if (importSubmit && importModal) {
       importSubmit.addEventListener('click', function () {
         SoundManager.playClick();
-        var ok = Settings.importJson(importJsonText.value);
+        var txt = importJsonText.value.trim();
+        if (!txt) return;
+        var ok, err;
+        if (txt.charAt(0) === '{') {
+          ok = Settings.importJson(txt);
+          err = 'Invalid JSON configuration';
+        } else {
+          var r = Settings.applyCode(txt);
+          ok = r.ok;
+          err = r.error;
+        }
         if (ok) {
           importModal.classList.remove('visible');
           buildTuningPanel();
           reset();
         } else {
-          alert('Invalid JSON configuration');
+          alert(err);
         }
       });
     }
 
     // Any setting change can affect the table, discs or effects: redraw
-    Settings.addChangeListener(function () { requestDraw(); });
+    Settings.addChangeListener(function () { requestDraw(); updateCodeBox(); });
+    loadCommunityCodes();
 
     // Setup proactive Service Worker update checking
     setupServiceWorker();
