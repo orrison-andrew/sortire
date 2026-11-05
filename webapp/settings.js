@@ -45,7 +45,6 @@
     { key: 'flood_ms', group: 'WINNER', label: 'Flood spread time', def: 1100, min: 0, max: 3000, step: 50, unit: 'ms' },
     { key: 'flood_feather', group: 'WINNER', label: 'Flood edge softness', def: 60, min: 0, max: 200, step: 5, unit: 'dp' },
     { key: 'fx_shockwave', group: 'WINNER', label: 'Winner shockwave ring', def: 0, isBool: true },
-    { key: 'fx_glow', group: 'WINNER', label: 'Winner glow', def: 0, isBool: true },
     { key: 'fx_particles', group: 'WINNER', label: 'Winner particle burst (0 = off)', def: 0, min: 0, max: 200, step: 10 },
 
     // Audio & Feedback
@@ -120,7 +119,6 @@
       wood_flood_ripple: 0.2,
       winner_grow: 0,         // winner appears instantly
       fx_shockwave: 1,
-      fx_glow: 1,
       fx_particles: 0
     })
   };
@@ -300,7 +298,6 @@
     ['marker_dot', 0, 1, 0.05],
     ['flood_feather', 0, 200, 5],
     ['fx_shockwave', 0, 1, 1],
-    ['fx_glow', 0, 1, 1],
     ['fx_particles', 0, 200, 10],
     ['sound_enabled', 0, 1, 1],
     ['sound_style', 0, 9, 1],

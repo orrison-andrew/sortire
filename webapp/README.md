@@ -103,11 +103,12 @@ When a new version is ready, a pill that says **"New version available"** appear
 - A PWA must be served over **HTTPS**. Any static host works: GitHub Pages, Netlify, Cloudflare Pages, or your own server. Upload the contents of this folder so that `index.html` is at the root of your URL.
 - **GitHub Pages:** in the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**. The workflow in `.github/workflows/deploy-pwa.yml` deploys the `webapp` folder on every push to `main`.
 - Replace `https://YOUR-APP-URL-HERE/` at the top of this file with your real address.
-- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v13`). This is how installed copies know to update.
+- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v14`). This is how installed copies know to update.
 - The app makes no network requests of its own beyond loading its own files: no analytics, no tracking, no accounts. The service worker only caches the app's own files.
 
 ### Settings codes (for developers)
 - Format: `[format byte][field count][packed values][crc8]` as hex. See the comment block above `CODE_FIELDS` in `settings.js`.
+- **`CODE_FIELDS` is append-only once codes are released.** Until the first public release the layout may still change (codes made before such a change stop working).
 - **`CODE_FIELDS` is append-only.** Never reorder, edit or delete an entry. A new setting goes on the end, and its schema entry gets added in the same change. A warning in the browser console tells you if you forget.
 - `node tools/settings-codec.test.js` checks round-trips, old and newer codes and a "golden" code that must always decode the same way. Run it before releasing a change to `settings.js`.
 - `codes.txt` is an optional shared list: one code per line, nothing else. The **Shuffle** button picks from it. To add a tuning, paste its code on a new line.

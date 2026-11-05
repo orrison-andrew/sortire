@@ -684,7 +684,7 @@
   // ═════════════════════════════════════════════════════════════════════════
   //  Winner effects layer (transparent WebGL canvas above the arena)
   // ═════════════════════════════════════════════════════════════════════════
-  // Shockwave ring + glow halo (full-screen quad) and a particle burst (GL points).
+  // Shockwave ring (full-screen quad) and a particle burst (GL points).
   var FX_FRAG = [
     '#ifdef GL_FRAGMENT_PRECISION_HIGH',
     'precision highp float;',
@@ -692,7 +692,7 @@
     'precision mediump float;',
     '#endif',
     'uniform vec2 uResPx, uC;',
-    'uniform float uDpr, uT, uShock, uGlow, uDiscR;',
+    'uniform float uDpr, uT, uShock;',
     'uniform vec3 uColor;',
     'void main() {',
     '  vec2 p = vec2(gl_FragCoord.x, uResPx.y - gl_FragCoord.y) / uDpr;',
@@ -703,12 +703,6 @@
     '    float w = 14.0 + 26.0 * uT;',
     '    float q = (d - R) / w;',
     '    a += exp(-q * q) * (1.0 - uT / 0.9) * 0.6;',
-    '  }',
-    '  if (uGlow > 0.5 && uT < 1.8) {',
-    '    float fade = 1.0 - smoothstep(0.5, 1.8, uT);',
-    '    float halo = exp(-max(d - uDiscR, 0.0) / (uDiscR * 0.6));',
-    '    halo *= smoothstep(uDiscR * 0.97, uDiscR * 1.03, d);',
-    '    a += halo * fade * (0.55 + 0.15 * sin(uT * 10.0));',
     '  }',
     '  a = clamp(a, 0.0, 1.0);',
     '  vec3 c = mix(uColor, vec3(1.0), 0.3);',
@@ -753,14 +747,14 @@
     var L = { onRestore: null, available: true };
     var gl = null, Q = null, PR = null, quadBuf = null, pBuf = null;
     var failed = false, lost = false;
-    var st = { active: false, t0: 0, x: 0, y: 0, color: [1, 1, 1], discR: 60, shock: true, glow: true,
+    var st = { active: false, t0: 0, x: 0, y: 0, color: [1, 1, 1], shock: true,
                n: 0, colA: [1, 1, 1], colB: [1, 1, 1] };
 
     function build() {
       gl = getGL(cv, { alpha: true, premultipliedAlpha: true, antialias: false });
       if (!gl) throw new Error('WebGL not available');
       if (!hasHighp(gl)) throw new Error('GPU lacks high-precision floats');
-      Q = buildProgram(gl, VERT, FX_FRAG, ['uResPx', 'uC', 'uDpr', 'uT', 'uShock', 'uGlow', 'uDiscR', 'uColor'], ['aPos']);
+      Q = buildProgram(gl, VERT, FX_FRAG, ['uResPx', 'uC', 'uDpr', 'uT', 'uShock', 'uColor'], ['aPos']);
       PR = buildProgram(gl, PART_VERT, PART_FRAG, ['uC', 'uRes', 'uT', 'uDpr', 'uColA', 'uColB'], ['aP']);
       quadBuf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
@@ -794,8 +788,8 @@
     }
 
     /**
-     * opts: color {r,g,b} for ring/glow, discR (CSS px, winner's final radius),
-     *       shock, glow (bool), particles (count), colA / colB {r,g,b} particle colours
+     * opts: color {r,g,b} for the ring, shock (bool), particles (count),
+     *       colA / colB {r,g,b} particle colours
      */
     L.trigger = function (x, y, opts) {
       if (failed || lost || !gl || gl.isContextLost()) return;
@@ -804,9 +798,7 @@
       st.t0 = performance.now();
       st.x = x; st.y = y;
       st.color = toArr(opts.color, [1, 1, 1]);
-      st.discR = Math.max(8, opts.discR || 60);
       st.shock = !!opts.shock;
-      st.glow = !!opts.glow;
       st.colA = toArr(opts.colA, st.color);
       st.colB = toArr(opts.colB, st.color);
 
@@ -850,15 +842,13 @@
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-        if (st.shock || st.glow) {
+        if (st.shock) {
           gl.useProgram(Q.prog);
           gl.uniform2f(Q.loc.uResPx, pw, ph);
           gl.uniform2f(Q.loc.uC, st.x, st.y);
           gl.uniform1f(Q.loc.uDpr, dpr);
           gl.uniform1f(Q.loc.uT, t);
           gl.uniform1f(Q.loc.uShock, st.shock ? 1 : 0);
-          gl.uniform1f(Q.loc.uGlow, st.glow ? 1 : 0);
-          gl.uniform1f(Q.loc.uDiscR, st.discR);
           gl.uniform3f(Q.loc.uColor, st.color[0], st.color[1], st.color[2]);
           gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
           gl.enableVertexAttribArray(0);

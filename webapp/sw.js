@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sortire-pwa-v12';
+const CACHE_NAME = 'sortire-pwa-v13';
 
 // The app can't start without these: if one is missing, install fails loudly.
 const CORE_ASSETS = [

@@ -27,42 +27,24 @@ function test(name, fn) {
   catch (e) { console.log('  FAIL ' + name + '\n       ' + e.message); process.exitCode = 1; }
 }
 
-// ── Golden codes (format 1). The 52-field ones predate the "Winner grows" switch. ──────────────────────────────────────
+// ── Golden codes ────────────────────────────────────────────────────────────
+// (Codes are not released yet, so the layout may still change. Once they are, add a golden
+// code for every layout you ship and never edit the old ones.)
 var GOLDEN = [
   {
     name: 'plain defaults',
-    code: '01341B95C11196321260084D123CE89E5928000F079C5930C540E6FA9CF1',
+    code: '01361B95C11196321260109A2479D13CB250001E0F38B2618A81CDF53AB30041',
     expect: { woodgrain_enabled: 0, wood_type: 3, radius: 60, countdown_ms: 2000, hue_step: 137.5,
               fx_particles: 0, pulse_amount: 0, ring_opacity: 0.9, hint_opacity: 0.7, hint_size: 22,
-              bg_saturation: 0.45, bg_value: 0.14, saturation: 0.78, order_text_scale: 0.95 }
-  }
-  ,
+              bg_saturation: 0.45, bg_value: 0.14, saturation: 0.78, order_text_scale: 0.95,
+              winner_grow: 1, winner_grow_ms: 1100, flood_ms: 1100, flood_grain: 0.6 }
+  },
   {
     name: 'woodgrain defaults',
-    code: '01349B949C9180321266084D123CE89E5928000F079C5930C540E6FA9C5C',
+    code: '01369B949C9196321264109A2479D13CB250001E0F38B2618A81CDF538B300ED',
     expect: { woodgrain_enabled: 1, wood_type: 3, wood_sheen_anim: 0, disc_gloss: 0.35, wood_flood_ripple: 0.2,
-              winner_flood: 1, winner_grow_ms: 0, fx_shockwave: 1, fx_glow: 1, fx_particles: 0 }
-  },
-  {
-    name: 'plain defaults (53 fields, with winner_grow)',
-    code: '01351B95C11196321260084D123CE89E5928000F079C5930C540E6FA9D4C',
-    expect: { woodgrain_enabled: 0, winner_grow: 1, winner_grow_ms: 1100, radius: 60 }
-  },
-  {
-    name: 'woodgrain defaults (53 fields, with winner_grow)',
-    code: '01359B949C9196321266084D123CE89E5928000F079C5930C540E6FA9CD8',
-    expect: { woodgrain_enabled: 1, winner_grow: 0, winner_grow_ms: 1100, disc_gloss: 0.35,
-              wood_flood_ripple: 0.2, wood_sheen_anim: 0, fx_particles: 0, fx_shockwave: 1, fx_glow: 1 }
-  },
-  {
-    name: 'plain defaults (55 fields, with flood_ms / flood_grain)',
-    code: '01371B95C11196321260084D123CE89E5928000F079C5930C540E6FA9D598002',
-    expect: { woodgrain_enabled: 0, winner_grow: 1, flood_ms: 1100, flood_grain: 0.6 }
-  },
-  {
-    name: 'woodgrain defaults (55 fields, with flood_ms / flood_grain)',
-    code: '01379B949C9196321266084D123CE89E5928000F079C5930C540E6FA9C5980B7',
-    expect: { woodgrain_enabled: 1, winner_grow: 0, flood_ms: 1100, flood_grain: 0.6, disc_gloss: 0.35 }
+              winner_flood: 1, winner_grow: 0, winner_grow_ms: 1100, flood_ms: 1100, flood_grain: 0.6,
+              fx_shockwave: 1, fx_particles: 0 }
   }
 ];
 
@@ -104,36 +86,7 @@ test('both presets round-trip', function () {
 
 test('woodgrain preset gives the woodgrain default code', function () {
   S.resetAll(); S.applyPreset('woodgrain');
-  assert.strictEqual(S.currentCode(), '01379B949C9196321266084D123CE89E5928000F079C5930C540E6FA9C5980B7');
-});
-
-test('a 53-field wood code (before flood_ms / flood_grain) applies with those at their defaults', function () {
-  S.resetAll();
-  var d = S.applyCode('01359B949C9196321266084D123CE89E5928000F079C5930C540E6FA9CD8');
-  assert.ok(d.ok, d.error);
-  assert.strictEqual(d.missing, 2);
-  assert.strictEqual(S.get('flood_ms'), 1100);
-  assert.strictEqual(S.get('flood_grain'), 0.6);
-  assert.strictEqual(S.get('winner_grow'), 0);
-  assert.strictEqual(S.get('disc_gloss'), 0.35);
-});
-
-test('the original 52-field wood code still gives the same wood look', function () {
-  // That code predates the grow switch: grow time 0 meant off. Applying it must match
-  // the current wood preset except for how "no grow" is expressed.
-  var OLD = '01349B949C9180321266084D123CE89E5928000F079C5930C540E6FA9C5C';
-  S.resetAll(); S.applyPreset('woodgrain');
-  var preset = {};
-  S.SCHEMA.forEach(function (s) { preset[s.key] = S.get(s.key); });
-  S.resetAll();
-  assert.ok(S.applyCode(OLD).ok);
-  S.SCHEMA.forEach(function (s) {
-    if (s.key === 'winner_grow' || s.key === 'winner_grow_ms') return;
-    assert.strictEqual(S.get(s.key), preset[s.key], s.key);
-  });
-  var effective = function (grow, ms) { return grow ? ms : 0; };
-  assert.strictEqual(effective(S.get('winner_grow'), S.get('winner_grow_ms')),
-                     effective(preset.winner_grow, preset.winner_grow_ms));
+  assert.strictEqual(S.currentCode(), '01369B949C9196321264109A2479D13CB250001E0F38B2618A81CDF538B300ED');
 });
 
 test('switching wood -> colors restores the plain defaults (incl. winner grow)', function () {

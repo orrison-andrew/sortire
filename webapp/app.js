@@ -181,7 +181,7 @@
 
   // --- Woodgrain table + winner effects (GPU layers, see woodgrain.js) ---
   var woodBg = null;            // live table layer
-  var fx = null;                // winner effects layer (shockwave, glow, particles)
+  var fx = null;                // winner effects layer (shockwave, particles)
   var floodTable = null;        // { species, seed } the table showed when the current flood started
   var floodGrain = null;        // { species, seed } the winner's own grain, spreading over it
 
@@ -245,9 +245,8 @@
   function triggerWinnerFx(w) {
     if (!fx) return;
     var shock = Settings.bool('fx_shockwave');
-    var glow = Settings.bool('fx_glow');
     var n = Math.round(Settings.get('fx_particles'));
-    if (!shock && !glow && n <= 0) return;
+    if (!shock && n <= 0) return;
 
     var sp = Settings.bool('woodgrain_enabled') ? WoodGrain.SPECIES[w.discSpecies] : null;
     var color = w.color, colA = w.color, colB = { r: 255, g: 255, b: 255 };
@@ -258,8 +257,7 @@
     }
     fx.trigger(w.x, w.y, {
       color: color, colA: colA, colB: colB,
-      discR: Settings.get('radius') * 1.3,
-      shock: shock, glow: glow, particles: n
+      shock: shock, particles: n
     });
   }
 
@@ -283,9 +281,15 @@
     return blendColors(palette.background, brightBackground(), bgMix);
   }
 
-  // Winner grow time in ms. The "Winner grows" switch off means instant (0).
+  // Winner grow time in ms (only meaningful while the "Winner grows" switch is on).
   function winnerGrowMs() {
     return Settings.bool('winner_grow') ? Settings.get('winner_grow_ms') : 0;
+  }
+
+  // Size of the winning disc relative to normal. With "Winner grows" off the disc never
+  // changes size; on, it eases up to 1.3x as `grow` goes 0 -> 1.
+  function winnerScale(grow) {
+    return Settings.bool('winner_grow') ? 1 + 0.3 * grow : 1;
   }
 
   function bgMixTarget() {
@@ -658,7 +662,7 @@
 
     var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
     var grow = 1 - Math.pow(1 - t, 3);
-    var radius = baseRadius * (1 + 0.3 * grow);
+    var radius = baseRadius * winnerScale(grow);
     drawCircle(w, w.x, w.y, radius, w.color, 1);
 
     if (Settings.bool('marker_enabled')) {
@@ -783,7 +787,7 @@
       grow = easeOut((growS <= 0) ? 1 : Math.min(1, e / growS));
       var spreadS = Settings.get('flood_ms') / 1000;
       spread = easeOut((spreadS <= 0) ? 1 : Math.min(1, e / spreadS));
-      discR = Settings.get('radius') * (1 + 0.3 * grow);
+      discR = Settings.get('radius') * winnerScale(grow);
       far = Math.max(
         Math.hypot(winnerFg.x, winnerFg.y),
         Math.hypot(w - winnerFg.x, winnerFg.y),
