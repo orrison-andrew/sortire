@@ -1,0 +1,345 @@
+/* Reset and viewport locks */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  background-color: #14101e;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  touch-action: none;
+}
+
+#arena {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+}
+
+/* Floating Gear Settings Button */
+#tune-btn {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #FFFFFF;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+#tune-btn:active {
+  transform: scale(0.92);
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* Tuning Panel Drawer */
+#tuning-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 65%;
+  max-height: 560px;
+  background: #181520;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(105%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#tuning-panel.visible {
+  transform: translateY(0);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-header h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #FFF;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.panel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #FFF;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.panel-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.panel-btn.done {
+  background: #8C52FF;
+  color: #FFFFFF;
+}
+
+.panel-btn.done:hover {
+  background: #9d6aff;
+}
+
+#tuning-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.panel-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 16px 0 8px;
+}
+
+.panel-group {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 4px 14px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Mode Switcher Inside Settings */
+.mode-box {
+  display: flex;
+  padding: 4px;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.mode-pill-panel {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.mode-pill-panel.active {
+  background: #FFFFFF;
+  color: #111111;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.tune-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tune-row:last-child {
+  border-bottom: none;
+}
+
+.tune-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  flex: 1;
+  padding-right: 12px;
+}
+
+.tune-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tune-control input[type="range"] {
+  width: 100px;
+  accent-color: #A370F7;
+  cursor: pointer;
+}
+
+.tune-val {
+  min-width: 48px;
+  text-align: right;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tune-control select {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.tune-mini-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #FFF;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tune-mini-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Switch toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: .25s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .25s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #8C52FF;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Modal for JSON import */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-backdrop.visible {
+  display: flex;
+}
+
+.modal-box {
+  background: #201b2a;
+  border-radius: 18px;
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.modal-box h3 {
+  color: #FFF;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.modal-box textarea {
+  width: 100%;
+  height: 160px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px;
+  color: #FFF;
+  font-family: ui-monospace, Menlo, Monaco, monospace;
+  font-size: 12px;
+  resize: none;
+  outline: none;
+  margin-bottom: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

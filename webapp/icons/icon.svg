@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient (Rich Dark Purpleheart) -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a1529"/>
+      <stop offset="50%" stop-color="#180e1b"/>
+      <stop offset="100%" stop-color="#0e0710"/>
+    </linearGradient>
+
+    <!-- Disc 1 Wood Gradient (Walnut) -->
+    <radialGradient id="disc1" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#8d6248"/>
+      <stop offset="60%" stop-color="#5a3d2c"/>
+      <stop offset="100%" stop-color="#2f1e14"/>
+    </radialGradient>
+
+    <!-- Disc 2 Wood Gradient (Maple/Oak) -->
+    <radialGradient id="disc2" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#ecd4aa"/>
+      <stop offset="60%" stop-color="#c89f68"/>
+      <stop offset="100%" stop-color="#8c6032"/>
+    </radialGradient>
+
+    <!-- Disc 3 Wood Gradient (Purpleheart) -->
+    <radialGradient id="disc3" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#a65596"/>
+      <stop offset="60%" stop-color="#7a376f"/>
+      <stop offset="100%" stop-color="#461d40"/>
+    </radialGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Disc 1 (Top Left) -->
+  <g filter="url(#shadow)">
+    <circle cx="180" cy="180" r="95" fill="url(#disc1)"/>
+    <circle cx="180" cy="180" r="93" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+    <circle cx="180" cy="180" r="95" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="5"/>
+  </g>
+
+  <!-- Disc 2 (Top Right) -->
+  <g filter="url(#shadow)">
+    <circle cx="340" cy="210" r="85" fill="url(#disc2)"/>
+    <circle cx="340" cy="210" r="83" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3"/>
+    <circle cx="340" cy="210" r="85" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="4"/>
+  </g>
+
+  <!-- Disc 3 (Bottom Center - The Winner) -->
+  <g filter="url(#shadow)">
+    <circle cx="256" cy="345" r="105" fill="url(#disc3)"/>
+    <!-- Countdown Arc Ring -->
+    <circle cx="256" cy="345" r="126" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="8" stroke-dasharray="420 600" stroke-linecap="round" transform="rotate(-90 256 345)"/>
+    <!-- Winner Marker Ring -->
+    <circle cx="256" cy="345" r="70" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="7"/>
+    <!-- Winner Center Dot -->
+    <circle cx="256" cy="345" r="24" fill="#FFFFFF"/>
+  </g>
+</svg>

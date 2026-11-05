@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sortire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Put every finger on the screen. Sortire decides who goes first.">
+  <meta name="theme-color" content="#14101e">
+
+  <!-- iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sortire">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Web App Manifest & Favicons -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="arena"></canvas>
+
+  <!-- Top-Right Settings Gear Icon -->
+  <button id="tune-btn" type="button" aria-label="Settings">⚙</button>
+
+  <!-- Full Settings Drawer Panel -->
+  <div id="tuning-panel" aria-modal="true" role="dialog">
+    <div class="panel-header">
+      <h2>Settings</h2>
+      <div class="panel-actions">
+        <button id="tune-import" class="panel-btn" type="button">Import</button>
+        <button id="tune-copy-json" class="panel-btn" type="button">JSON</button>
+        <button id="tune-copy" class="panel-btn" type="button">Copy</button>
+        <button id="tune-reset" class="panel-btn" type="button">Reset</button>
+        <button id="tune-done" class="panel-btn done" type="button">Done</button>
+      </div>
+    </div>
+    <div id="tuning-content"></div>
+  </div>
+
+  <!-- Import JSON Modal -->
+  <div id="import-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <h3>Import Settings JSON</h3>
+      <textarea id="import-json-text" placeholder='{"countdown_ms": 2000, "radius": 60, ...}'></textarea>
+      <div class="modal-actions">
+        <button id="import-cancel" class="panel-btn" type="button">Cancel</button>
+        <button id="import-submit" class="panel-btn done" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="woodgrain.js"></script>
+  <script src="sound.js"></script>
+  <script src="settings.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
