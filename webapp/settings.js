@@ -30,6 +30,7 @@
     { key: 'sound_style', group: 'AUDIO', label: 'Pop sound style', def: 0, min: 0, max: 9, step: 1, options: ['Pop', 'Bubble', 'Blip', 'Laser', 'Snap', 'Beep', 'Thud', 'Ping', 'Boing', 'Click'] },
 
     // Color Controls
+    { key: 'winner_bg_enabled', group: 'COLORS', label: 'Background from last winner', def: 1, isBool: true, resetsRound: false },
     { key: 'woodgrain_enabled', group: 'COLORS', label: 'Enable woodgrain style', def: 1, isBool: true, resetsRound: true },
     { key: 'random_hue', group: 'COLORS', label: 'Random base hue each round', def: 0, isBool: true, resetsRound: true },
     { key: 'base_hue', group: 'COLORS', label: 'Base hue', def: 260, min: 0, max: 360, step: 5, unit: '°', resetsRound: true },
@@ -42,7 +43,6 @@
 
     // Appearance & Themes
     { key: 'wood_type', group: 'APPEARANCE', label: 'Wood species', def: 3, min: 0, max: 5, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart'], resetsRound: true },
-    { key: 'render_mode', group: 'APPEARANCE', label: 'Render mode', def: 0, min: 0, max: 1, step: 1, options: ['2D', '3D Fast'] },
     { key: 'radius', group: 'APPEARANCE', label: 'Circle radius', def: 60, min: 20, max: 120, step: 2, unit: 'dp' },
     { key: 'pulse_amount', group: 'APPEARANCE', label: 'Pulse amount', def: 0.06, min: 0, max: 0.3, step: 0.01 },
     { key: 'pulse_speed', group: 'APPEARANCE', label: 'Pulse speed', def: 3.5, min: 0, max: 20, step: 0.5 },

@@ -88,19 +88,35 @@
     return hsvToRgb(hsv.h, hsv.s, hsv.v);
   }
 
-  // --- Palette Class ---
+  // --- Palette Class & Session Winner Tracking ---
+  var lastWinnerSpecies = null;
+  var lastWinnerColor   = null;
+
+  // Per-session background seed — randomised on first load and whenever the
+  // species background changes so the grain pattern never looks identical.
+  var bgSeed = Math.floor(Math.random() * 100000) + 1;
+
   function Palette() {
-    this.baseHue = Settings.bool('random_hue') ? Math.random() * 360 : Settings.get('base_hue');
     this.hueStep = Settings.get('hue_step');
     this.saturation = Settings.get('saturation');
     this.valueEven = Settings.get('value_even');
     this.valueOdd = Settings.get('value_odd');
 
-    this.background = hsvToRgb(
-      this.baseHue % 360,
-      Settings.get('bg_saturation'),
-      Settings.get('bg_value')
-    );
+    if (Settings.bool('winner_bg_enabled') && lastWinnerColor) {
+      // Background derived from slightly muted version of last winning color
+      var hsv = rgbToHsv(lastWinnerColor.r, lastWinnerColor.g, lastWinnerColor.b);
+      this.baseHue = hsv.h;
+      var mutedSat = Math.min(Settings.get('bg_saturation'), hsv.s * 0.65);
+      var mutedVal = Settings.get('bg_value');
+      this.background = hsvToRgb(hsv.h, mutedSat, mutedVal);
+    } else {
+      this.baseHue = Settings.bool('random_hue') ? Math.random() * 360 : Settings.get('base_hue');
+      this.background = hsvToRgb(
+        this.baseHue % 360,
+        Settings.get('bg_saturation'),
+        Settings.get('bg_value')
+      );
+    }
   }
 
   Palette.prototype.color = function (index) {
@@ -125,7 +141,7 @@
   var winnerId = null;
   var ranking = [];
   var revealed = 0;
-  var isDirty = true;
+  var animFrameId = null;
 
   function Finger(x, y, color, discSpecies, seed, shadeShift) {
     this.x = x;
@@ -135,6 +151,11 @@
     this.seed = seed;
     this.shadeShift = shadeShift;
     this.down = true;
+
+    // Pre-generate wooden puck canvas once at crisp resolution
+    var baseRadius = Settings.get('radius');
+    var discDiameter = Math.max(32, Math.round(baseRadius * 2 * dpr * 1.5));
+    this.puckCanvas = WoodGrain.getDiscCanvas(discDiameter, discSpecies, seed, shadeShift);
   }
 
   function getBaseWoodTypeKey() {
@@ -158,6 +179,22 @@
     requestDraw();
   }
 
+  function updateTabletopBackground() {
+    var bgEl = document.getElementById('wood-bg');
+    if (!bgEl) return;
+
+    var woodOn = Settings.bool('woodgrain_enabled');
+    if (!woodOn) return;   // canvas draw() handles the colour fill instead
+
+    // winner_bg_enabled ON + a previous winner exists → use their species (muted)
+    // winner_bg_enabled OFF (or no previous winner)   → use the chosen species + fresh seed
+    if (Settings.bool('winner_bg_enabled') && lastWinnerSpecies) {
+      WoodGrain.renderBackground(bgEl, lastWinnerSpecies, bgSeed, /*isMuted=*/true);
+    } else {
+      WoodGrain.renderBackground(bgEl, getBaseWoodTypeKey(), bgSeed, /*isMuted=*/false);
+    }
+  }
+
   function reset() {
     fingers = {};
     fingerIds = [];
@@ -167,9 +204,16 @@
     nextColorIndex = 0;
     phase = 'WAITING';
     palette = new Palette();
+
+    // Fresh grain pattern each round (new seed → different pith position / ring phase)
+    bgSeed = Math.floor(Math.random() * 100000) + 1;
+
+    var bgWinnerEl = document.getElementById('wood-bg-winner');
+    if (bgWinnerEl) bgWinnerEl.style.opacity = '0';
+
+    updateTabletopBackground();
     requestDraw();
   }
-
   function resolve(now) {
     phase = 'RESULT';
     resultStart = now;
@@ -179,6 +223,13 @@
       winnerId = ids[Math.floor(Math.random() * ids.length)];
       var growMs = Settings.get('winner_grow_ms');
       animationEnd = now + Math.max(growMs, 800);
+
+      var w = fingers[winnerId];
+      var bgWinnerEl = document.getElementById('wood-bg-winner');
+      if (w && bgWinnerEl && Settings.bool('woodgrain_enabled')) {
+        WoodGrain.renderBackground(bgWinnerEl, w.discSpecies, w.seed);
+      }
+
       SoundManager.playWinner();
       haptic('result');
     } else {
@@ -270,17 +321,19 @@
   // --- Touch Event Handlers ---
   function onTouchStart(e) {
     e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
     for (var i = 0; i < e.changedTouches.length; i++) {
       var t = e.changedTouches[i];
-      addFinger(t.identifier, t.clientX, t.clientY);
+      addFinger(t.identifier, t.clientX - rect.left, t.clientY - rect.top);
     }
   }
 
   function onTouchMove(e) {
     e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
     for (var i = 0; i < e.changedTouches.length; i++) {
       var t = e.changedTouches[i];
-      moveFinger(t.identifier, t.clientX, t.clientY);
+      moveFinger(t.identifier, t.clientX - rect.left, t.clientY - rect.top);
     }
   }
 
@@ -300,17 +353,33 @@
     }
   }
 
-  // Desktop mouse fallback for testing
+  // Desktop mouse fallback & multi-touch testing (Hold Shift to pin multiple fingers)
   var mouseId = 999999;
   var mouseDown = false;
+  var pinnedMouseCount = 0;
+
   function onMouseDown(e) {
     if (e.target.closest('#tune-btn') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal')) return;
-    mouseDown = true;
-    addFinger(mouseId, e.clientX, e.clientY);
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+
+    if (e.shiftKey) {
+      var pinId = 'pin_' + (++pinnedMouseCount);
+      addFinger(pinId, x, y);
+    } else {
+      mouseDown = true;
+      addFinger(mouseId, x, y);
+    }
   }
+
   function onMouseMove(e) {
-    if (mouseDown) moveFinger(mouseId, e.clientX, e.clientY);
+    if (mouseDown) {
+      var rect = canvas.getBoundingClientRect();
+      moveFinger(mouseId, e.clientX - rect.left, e.clientY - rect.top);
+    }
   }
+
   function onMouseUp(e) {
     if (mouseDown) {
       mouseDown = false;
@@ -323,8 +392,8 @@
     var w = window.innerWidth;
     var h = window.innerHeight;
     dpr = window.devicePixelRatio || 1;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     requestDraw();
@@ -335,7 +404,7 @@
     alpha = (alpha === undefined) ? 1 : Math.max(0, Math.min(1, alpha));
     var woodgrainOn = Settings.bool('woodgrain_enabled');
 
-    if (woodgrainOn) {
+    if (woodgrainOn && fg && fg.puckCanvas) {
       // Drop shadow behind wooden puck
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,' + (0.45 * alpha) + ')';
@@ -347,11 +416,10 @@
       ctx.fill();
       ctx.restore();
 
-      // Disc image
-      var discCanvas = WoodGrain.getDiscCanvas(r * 2 * dpr, fg.discSpecies, fg.seed, fg.shadeShift);
+      // Disc image from pre-rendered puck canvas
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.drawImage(discCanvas, x - r, y - r, r * 2, r * 2);
+      ctx.drawImage(fg.puckCanvas, x - r, y - r, r * 2, r * 2);
       ctx.restore();
     } else {
       ctx.save();
@@ -508,6 +576,8 @@
   }
 
   function render(now) {
+    animFrameId = null; // Mark current frame as consumed
+
     var countdownMs = Settings.get('countdown_ms');
     if (phase === 'COUNTING' && now - countdownStart >= countdownMs) {
       resolve(now);
@@ -521,32 +591,38 @@
     var w = window.innerWidth;
     var h = window.innerHeight;
 
+    ctx.clearRect(0, 0, w, h);
+
     var woodgrainOn = Settings.bool('woodgrain_enabled');
+    var bgEl = document.getElementById('wood-bg');
+    var bgWinnerEl = document.getElementById('wood-bg-winner');
     var winnerFg = fingers[winnerId];
 
-    if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && winnerFg) {
-      var growS = Settings.get('winner_grow_ms') / 1000;
-      var e = (now - resultStart) / 1000;
-      var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
-      var grow = 1 - Math.pow(1 - t, 3);
+    if (woodgrainOn) {
+      if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
+      if (bgWinnerEl && bgWinnerEl.style.display !== 'block') bgWinnerEl.style.display = 'block';
 
-      if (woodgrainOn) {
-        var baseWood = WoodGrain.getMasterTexture(getBaseWoodTypeKey());
-        var winWood = WoodGrain.getMasterTexture(winnerFg.discSpecies);
-        ctx.drawImage(baseWood, 0, 0, w, h);
-        ctx.save();
-        ctx.globalAlpha = Math.min(1, Math.max(0, grow));
-        ctx.drawImage(winWood, 0, 0, w, h);
-        ctx.restore();
+      if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && winnerFg) {
+        var growS = Settings.get('winner_grow_ms') / 1000;
+        var e = (now - resultStart) / 1000;
+        var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
+        var grow = 1 - Math.pow(1 - t, 3);
+        if (bgWinnerEl) bgWinnerEl.style.opacity = grow.toFixed(3);
       } else {
+        if (bgWinnerEl) bgWinnerEl.style.opacity = '0';
+      }
+    } else {
+      if (bgEl && bgEl.style.display !== 'none') bgEl.style.display = 'none';
+      if (bgWinnerEl && bgWinnerEl.style.display !== 'none') bgWinnerEl.style.display = 'none';
+
+      if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && winnerFg) {
+        var growS = Settings.get('winner_grow_ms') / 1000;
+        var e = (now - resultStart) / 1000;
+        var t = (growS <= 0) ? 1 : Math.min(1, e / growS);
+        var grow = 1 - Math.pow(1 - t, 3);
         var blended = blendColors(palette.background, winnerFg.color, grow);
         ctx.fillStyle = rgbString(blended);
         ctx.fillRect(0, 0, w, h);
-      }
-    } else {
-      if (woodgrainOn) {
-        var bgWood = WoodGrain.getMasterTexture(getBaseWoodTypeKey());
-        ctx.drawImage(bgWood, 0, 0, w, h);
       } else {
         ctx.fillStyle = rgbString(palette.background);
         ctx.fillRect(0, 0, w, h);
@@ -568,16 +644,13 @@
 
     var needsFrame = (fingerIds.length > 0) || (phase === 'RESULT' && now < animationEnd);
     if (needsFrame) {
-      requestAnimationFrame(render);
-    } else {
-      isDirty = false;
+      animFrameId = requestAnimationFrame(render);
     }
   }
 
   function requestDraw() {
-    if (!isDirty) {
-      isDirty = true;
-      requestAnimationFrame(render);
+    if (!animFrameId) {
+      animFrameId = requestAnimationFrame(render);
     }
   }
 
@@ -717,6 +790,32 @@
         groupEl.appendChild(row);
       });
 
+      if (groupKey === 'SYSTEM') {
+        var updateRow = document.createElement('div');
+        updateRow.className = 'tune-row';
+        var updateLabel = document.createElement('div');
+        updateLabel.className = 'tune-label';
+        updateLabel.textContent = 'App version & updates';
+        var updateCtrl = document.createElement('div');
+        updateCtrl.className = 'tune-control';
+        var checkBtn = document.createElement('button');
+        checkBtn.className = 'panel-btn';
+        checkBtn.type = 'button';
+        checkBtn.textContent = 'Check for updates';
+        checkBtn.addEventListener('click', function () {
+          SoundManager.playClick();
+          checkBtn.textContent = 'Checking...';
+          checkForUpdates(function (hasUpdate) {
+            checkBtn.textContent = hasUpdate ? 'Update ready!' : 'Up to date';
+            setTimeout(function () { checkBtn.textContent = 'Check for updates'; }, 2500);
+          });
+        });
+        updateCtrl.appendChild(checkBtn);
+        updateRow.appendChild(updateLabel);
+        updateRow.appendChild(updateCtrl);
+        groupEl.appendChild(updateRow);
+      }
+
       content.appendChild(groupEl);
     });
   }
@@ -731,6 +830,11 @@
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', onTouchCancel, { passive: false });
+
+    // Prevent iOS Safari multi-finger gesture interference (pinch zoom, rotate)
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
 
     // Desktop mouse fallback
     window.addEventListener('mousedown', onMouseDown);
@@ -832,18 +936,116 @@
       });
     }
 
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('./sw.js').then(function (reg) {
-          console.log('Sortire Service Worker registered:', reg.scope);
-        }).catch(function (err) {
-          console.error('Sortire Service Worker registration failed:', err);
-        });
+    // Render initial vector SVG tabletop background
+    updateTabletopBackground();
+
+    Settings.addChangeListener(function (s) {
+      if (!s || s.key === 'wood_type' || s.key === 'woodgrain_enabled') {
+        updateTabletopBackground();
+      }
+    });
+
+    // Setup proactive Service Worker update checking
+    setupServiceWorker();
+
+    // Start initial frame render
+    requestDraw();
+  }
+
+  // --- Proactive PWA Update Management ---
+  var swRegistration = null;
+  var waitingWorker = null;
+
+  function showUpdateToast(worker) {
+    waitingWorker = worker;
+    var toast = document.getElementById('update-toast');
+    if (toast) {
+      toast.classList.add('visible');
+    }
+  }
+
+  function checkForUpdates(cb) {
+    if (!swRegistration) {
+      if (cb) cb(false);
+      return;
+    }
+    swRegistration.update().then(function (reg) {
+      if (reg && reg.waiting) {
+        showUpdateToast(reg.waiting);
+        if (cb) cb(true);
+      } else if (reg && reg.installing) {
+        if (cb) cb(true);
+      } else {
+        if (cb) cb(false);
+      }
+    }).catch(function () {
+      if (cb) cb(false);
+    });
+  }
+
+  function setupServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    var updateBtn = document.getElementById('update-btn');
+    if (updateBtn) {
+      updateBtn.addEventListener('click', function () {
+        SoundManager.playClick();
+        if (waitingWorker) {
+          waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+          window.location.reload();
+        }
       });
     }
 
-    requestDraw();
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').then(function (reg) {
+        swRegistration = reg;
+        console.log('Sortire Service Worker registered:', reg.scope);
+
+        // 1. If an updated worker is already waiting, prompt immediately
+        if (reg.waiting) {
+          showUpdateToast(reg.waiting);
+        }
+
+        // 2. Watch for an incoming updated worker
+        reg.addEventListener('updatefound', function () {
+          var newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', function () {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateToast(newWorker);
+            }
+          });
+        });
+
+        // 3. Proactively check on startup
+        reg.update().catch(function () {});
+
+        // 4. Periodic check every 15 minutes while app is running
+        setInterval(function () {
+          reg.update().catch(function () {});
+        }, 15 * 60 * 1000);
+      }).catch(function (err) {
+        console.error('Sortire Service Worker registration failed:', err);
+      });
+    });
+
+    // 5. Proactively check whenever user switches back to the app / tab
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && swRegistration) {
+        swRegistration.update().catch(function () {});
+      }
+    });
+
+    // 6. Automatically reload when the new worker takes control
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

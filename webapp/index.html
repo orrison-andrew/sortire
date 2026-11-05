@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Sortire">
+  <meta name="format-detection" content="telephone=no">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- Web App Manifest & Favicons -->
@@ -21,10 +22,20 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Crisp Resolution-Independent SVG Tabletop Background -->
+  <div id="wood-bg" aria-hidden="true"></div>
+  <div id="wood-bg-winner" aria-hidden="true"></div>
+
   <canvas id="arena"></canvas>
 
   <!-- Top-Right Settings Gear Icon -->
   <button id="tune-btn" type="button" aria-label="Settings">⚙</button>
+
+  <!-- Update Ready Toast Pill -->
+  <div id="update-toast" class="update-toast" role="alert" aria-live="polite">
+    <span id="update-msg">New version available</span>
+    <button id="update-btn" type="button">Update</button>
+  </div>
 
   <!-- Full Settings Drawer Panel -->
   <div id="tuning-panel" aria-modal="true" role="dialog">

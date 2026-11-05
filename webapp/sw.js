@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sortire-pwa-v1';
+const CACHE_NAME = 'sortire-pwa-v5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -34,6 +34,13 @@ self.addEventListener('activate', (event) => {
       );
     }).then(() => self.clients.claim())
   );
+});
+
+// Allow app to trigger immediate activation
+self.addEventListener('message', (event) => {
+  if (event.data && (event.data === 'SKIP_WAITING' || event.data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
