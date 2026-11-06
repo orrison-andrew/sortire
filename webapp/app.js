@@ -5,7 +5,6 @@
 (function () {
   'use strict';
 
-  // --- Modes ---
   var MODES = {
     FIRST: {
       id: 'FIRST',
@@ -21,7 +20,6 @@
 
   var currentMode = localStorage.getItem('sortire_mode') === 'ORDER' ? MODES.ORDER : MODES.FIRST;
 
-  // --- Color & Palette Helpers ---
   function hsvToRgb(h, s, v) {
     h = (h % 360 + 360) % 360;
     var c = v * s;
@@ -88,13 +86,10 @@
     return hsvToRgb(hsv.h, hsv.s, hsv.v);
   }
 
-  // --- Palette Class & Session Winner Tracking ---
-  var lastWinnerColor   = null;   // palette colour (used by the colours-mode background)
-  var lastWinnerWood    = null;   // species key of the winning disc (its grain becomes the next table)
-  var lastWinnerSeed    = 0;      // grain seed of that winning wood
+  var lastWinnerColor   = null;
+  var lastWinnerWood    = null;
+  var lastWinnerSeed    = 0;
 
-  // Per-session background seed — randomised on first load and whenever the
-  // species background changes so the grain pattern never looks identical.
   var bgSeed = Math.floor(Math.random() * 100000) + 1;
 
   function Palette() {
@@ -102,14 +97,9 @@
     this.saturation = Settings.get('saturation');
     this.valueEven = Settings.get('value_even');
     this.valueOdd = Settings.get('value_odd');
-
-    // Finger colours: the starting hue is random every round, so the first finger
-    // is never the same colour as last time (or as the last winner).
     this.baseHue = Math.random() * 360;
 
-    // Background colour (used when woodgrain is off)
     if (Settings.bool('winner_bg_enabled') && lastWinnerColor) {
-      // Derived from a slightly muted version of the last winning colour
       var hsv = rgbToHsv(lastWinnerColor.r, lastWinnerColor.g, lastWinnerColor.b);
       var mutedSat = Math.min(Settings.get('bg_saturation'), hsv.s * 0.65);
       this.background = hsvToRgb(hsv.h, mutedSat, Settings.get('bg_value'));
@@ -125,16 +115,15 @@
     return hsvToRgb(hue, this.saturation, value);
   };
 
-  // --- Arena State Machine ---
   var canvas = document.getElementById('arena');
   var ctx = canvas.getContext('2d');
   var dpr = window.devicePixelRatio || 1;
 
-  var fingers = {};           // id -> Finger object
-  var fingerIds = [];         // insertion order
+  var fingers = {};
+  var fingerIds = [];
   var palette = new Palette();
   var nextColorIndex = 0;
-  var phase = 'WAITING';      // WAITING, COUNTING, RESULT
+  var phase = 'WAITING';
   var countdownStart = 0;
   var resultStart = 0;
   var animationEnd = 0;
@@ -143,24 +132,33 @@
   var revealed = 0;
   var animFrameId = null;
 
-  function Finger(x, y, color, discSpecies, seed, shadeShift) {
+  function Finger(x, y, color, discSpecies, seed, shadeShift, discRockType) {
     this.x = x;
     this.y = y;
     this.color = color;
     this.discSpecies = discSpecies;
     this.seed = seed;
     this.shadeShift = shadeShift;
+    this.discRockType = discRockType;
     this.down = true;
 
-    // Pre-generate wooden puck canvas once at crisp resolution
     var baseRadius = Settings.get('radius');
     var discDiameter = Math.max(32, Math.round(baseRadius * 2 * dpr * 1.5));
-    this.puckCanvas = WoodGrain.getDiscCanvas(discDiameter, discSpecies, seed, shadeShift);
+    if (Settings.bool('rockgrain_enabled') && typeof RockGrainGL !== 'undefined') {
+      this.puckCanvas = RockGrainGL.getDiscCanvas(discDiameter, discRockType, seed, shadeShift);
+    } else if (typeof WoodGrain !== 'undefined') {
+      this.puckCanvas = WoodGrain.getDiscCanvas(discDiameter, discSpecies, seed, shadeShift);
+    }
   }
 
   function getBaseWoodTypeKey() {
     var idx = Math.round(Settings.get('wood_type'));
     return WoodGrain.getSpeciesKey(idx);
+  }
+
+  function getBaseRockTypeKey() {
+    var idx = Math.round(Settings.get('rock_type'));
+    return RockGrainGL.getTypeKey(idx);
   }
 
   function haptic(type) {
@@ -179,18 +177,15 @@
     requestDraw();
   }
 
-  // --- Woodgrain table + winner effects (GPU layers, see woodgrain.js) ---
-  var woodBg = null;            // live table layer
-  var fx = null;                // winner effects layer (shockwave, particles)
-  var floodTable = null;        // { species, seed } the table showed when the current flood started
-  var floodGrain = null;        // { species, seed } the winner's own grain, spreading over it
+  var woodBg = null;
+  var fx = null;
+  var floodTable = null;
+  var floodGrain = null;
 
-  // Wood species the table is showing right now (the previous winner's), or null = the base wood
   function currentTableWood() {
     return (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
   }
 
-  // The table's actual grain: species + seed. After a round it IS the winner's grain.
   function currentTableGrain() {
     if (Settings.bool('winner_bg_enabled') && lastWinnerWood) {
       return { species: lastWinnerWood, seed: lastWinnerSeed };
@@ -198,10 +193,8 @@
     return { species: getBaseWoodTypeKey(), seed: bgSeed };
   }
 
-  // Ease-out used by the disc grow and the flood spread
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
-  // --- Device tilt: moves the sheen, the disc gloss and the disc shadows ---
   var tilt = { x: 0, y: 0, settled: false, pending: false };
 
   function onDeviceOrientation(e) {
@@ -209,12 +202,11 @@
     var nx = Math.max(-1, Math.min(1, e.gamma / 30));
     var ny = Math.max(-1, Math.min(1, (e.beta - 40) / 30));
     var px = tilt.x, py = tilt.y;
-    tilt.x += (nx - tilt.x) * 0.25;     // low-pass filter
+    tilt.x += (nx - tilt.x) * 0.25;
     tilt.y += (ny - tilt.y) * 0.25;
     if (Math.abs(tilt.x - px) + Math.abs(tilt.y - py) > 0.004) requestDraw();
   }
 
-  // iOS only delivers orientation events after a permission prompt that must come from a tap
   function requestTiltPermission() {
     if (tilt.settled || tilt.pending) return;
     try {
@@ -225,7 +217,7 @@
           tilt.pending = false;
           tilt.settled = true;
           if (r === 'granted') window.addEventListener('deviceorientation', onDeviceOrientation);
-        }).catch(function () { tilt.pending = false; });   // not a user gesture: try again on the next tap
+        }).catch(function () { tilt.pending = false; });
       } else {
         tilt.settled = true;
         window.addEventListener('deviceorientation', onDeviceOrientation);
@@ -233,7 +225,6 @@
     } catch (e) { tilt.settled = true; }
   }
 
-  // Light direction for disc gloss and shadows (-1..1; default: from the upper left)
   function lightVec() {
     var on = Settings.bool('wood_tilt');
     return {
@@ -250,7 +241,7 @@
 
     var sp = Settings.bool('woodgrain_enabled') ? WoodGrain.SPECIES[w.discSpecies] : null;
     var color = w.color, colA = w.color, colB = { r: 255, g: 255, b: 255 };
-    if (sp) {   // sawdust: the winning wood's light and dark tones
+    if (sp) {
       color = { r: sp.light[0], g: sp.light[1], b: sp.light[2] };
       colA = color;
       colB = { r: sp.dark[0], g: sp.dark[1], b: sp.dark[2] };
@@ -261,17 +252,10 @@
     });
   }
 
-  // --- Colours-mode background brightness ---
-  // The background shows a dimmed version of the previous winner's colour while fingers
-  // are on the screen, and darkens to the dark resting version once they are removed.
-  // (Right after a win it is still the full flood colour and eases down to the dim level.)
-  // How strongly the previous winner's colour shows while fingers are down
-  // (0 = fully dark resting background, 1 = full winner colour). Lower = dimmer.
   var BG_DIM_LEVEL = 0.35;
-
-  var bgMix = 0;          // current level: 0 = dark resting background, 1 = full winner colour
+  var bgMix = 0;
   var bgMixTime = 0;
-  var floodBase = null;   // background the winner colour floods over
+  var floodBase = null;
 
   function brightBackground() {
     return (Settings.bool('winner_bg_enabled') && lastWinnerColor) ? lastWinnerColor : palette.background;
@@ -281,19 +265,15 @@
     return blendColors(palette.background, brightBackground(), bgMix);
   }
 
-  // Winner grow time in ms (only meaningful while the "Winner grows" switch is on).
   function winnerGrowMs() {
     return Settings.bool('winner_grow') ? Settings.get('winner_grow_ms') : 0;
   }
 
-  // Size of the winning disc relative to normal. With "Winner grows" off the disc never
-  // changes size; on, it eases up to 1.3x as `grow` goes 0 -> 1.
   function winnerScale(grow) {
     return Settings.bool('winner_grow') ? 1 + 0.3 * grow : 1;
   }
 
   function bgMixTarget() {
-    // The flood holds the full winner colour while the result is showing
     var w = fingers[winnerId];
     if (phase === 'RESULT' && currentMode === MODES.FIRST && Settings.bool('winner_flood') && w) return 1;
     return fingerIds.length > 0 ? BG_DIM_LEVEL : 0;
@@ -303,7 +283,7 @@
     var dt = bgMixTime ? Math.min(100, now - bgMixTime) : 16;
     bgMixTime = now;
     var target = bgMixTarget();
-    var tau = target > bgMix ? 150 : 450;     // brighten quickly, darken gently
+    var tau = target > bgMix ? 150 : 450;
     bgMix += (target - bgMix) * (1 - Math.exp(-dt / tau));
     if (Math.abs(target - bgMix) < 0.004) bgMix = target;
   }
@@ -318,13 +298,12 @@
     phase = 'WAITING';
     palette = new Palette();
 
-    // Same grain every round while tinting from the last winner; otherwise a fresh
-    // grain pattern each round (new seed → different pith position / ring phase)
     if (!Settings.bool('winner_bg_enabled')) bgSeed = Math.floor(Math.random() * 100000) + 1;
 
     if (fx) fx.stop();
     requestDraw();
   }
+
   function resolve(now) {
     phase = 'RESULT';
     resultStart = now;
@@ -337,24 +316,19 @@
 
       var w = fingers[winnerId];
       if (w) {
-        // The flood spreads over whatever background was showing, then the winner's
-        // colour / wood becomes the background for the next round.
         floodBase = currentBackgroundColor();
         floodTable = currentTableGrain();
-        // The winner's wood gets a fresh grain of its own; it spreads over the table
-        // now and is the table in the next round.
         floodGrain = { species: w.discSpecies, seed: Math.floor(Math.random() * 100000) + 1 };
         lastWinnerColor = w.color;
         lastWinnerWood  = floodGrain.species;
         lastWinnerSeed  = floodGrain.seed;
-        if (Settings.bool('winner_flood')) bgMix = 1;   // flood ends on the full colour; next round eases down to BG_DIM_LEVEL
+        if (Settings.bool('winner_flood')) bgMix = 1;
         triggerWinnerFx(w);
       }
 
       SoundManager.playWinner();
       haptic('result');
     } else {
-      // ORDER mode: Fisher-Yates shuffle
       for (var i = ids.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
         var temp = ids[i]; ids[i] = ids[j]; ids[j] = temp;
@@ -387,8 +361,6 @@
     }
   }
 
-  // Wood for a new disc: never the wood the table is showing, and never one that is
-  // already on screen until every other species has been used (then fewest repeats).
   function pickDiscWood() {
     var keys = WoodGrain.SPECIES_KEYS;
     var tableWood = currentTableWood() || getBaseWoodTypeKey();
@@ -400,15 +372,30 @@
     });
     var best = Infinity, pool = [];
     keys.forEach(function (k) {
-      var score = used[k] + (k === tableWood ? 100 : 0);   // table wood only as a last resort
+      var score = used[k] + (k === tableWood ? 100 : 0);
       if (score < best) { best = score; pool = [k]; }
       else if (score === best) pool.push(k);
     });
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // Finger ids are always strings: touch identifiers are numbers, but object keys
-  // (for..in) and ranking/winnerId lookups need one consistent type.
+  function pickDiscRock() {
+    var types = RockGrainGL.ROCK_TYPES;
+    var used = {};
+    types.forEach(function (k) { used[k] = 0; });
+    fingerIds.forEach(function (id) {
+      var f = fingers[id];
+      if (f && used[f.discRockType] !== undefined) used[f.discRockType]++;
+    });
+    var best = Infinity, pool = [];
+    types.forEach(function (k) {
+      var score = used[k];
+      if (score < best) { best = score; pool = [k]; }
+      else if (score === best) pool.push(k);
+    });
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   function addFinger(id, x, y) {
     id = String(id);
     SoundManager.unlock();
@@ -422,11 +409,12 @@
     }
 
     var discWood = pickDiscWood();
+    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'granite';
     var shadeShift = (Math.random() * 0.5 - 0.25);
     var seed = Math.floor(Math.random() * 100000);
     var color = palette.color(nextColorIndex++);
 
-    fingers[id] = new Finger(x, y, color, discWood, seed, shadeShift);
+    fingers[id] = new Finger(x, y, color, discWood, seed, shadeShift, discRock);
     fingerIds.push(id);
 
     var style = Math.round(Settings.get('sound_style'));
@@ -444,7 +432,7 @@
       SoundManager.playPop(style);
     }
     if (phase === 'RESULT') {
-      fg.down = false; // keep visually on screen
+      fg.down = false;
     } else {
       delete fingers[id];
       var idx = fingerIds.indexOf(id);
@@ -464,7 +452,6 @@
     }
   }
 
-  // --- Touch Event Handlers ---
   function onTouchStart(e) {
     e.preventDefault();
     var rect = canvas.getBoundingClientRect();
@@ -499,7 +486,6 @@
     }
   }
 
-  // Desktop mouse fallback & multi-touch testing (Hold Shift to pin multiple fingers)
   var mouseId = 999999;
   var mouseDown = false;
   var pinnedMouseCount = 0;
@@ -533,7 +519,6 @@
     }
   }
 
-  // --- Rendering Functions ---
   function resizeCanvas() {
     var w = window.innerWidth;
     var h = window.innerHeight;
@@ -549,14 +534,11 @@
     if (r <= 0) return;
     alpha = (alpha === undefined) ? 1 : Math.max(0, Math.min(1, alpha));
     var woodgrainOn = Settings.bool('woodgrain_enabled');
+    var rockgrainOn = Settings.bool('rockgrain_enabled');
 
-    if (woodgrainOn && fg && fg.puckCanvas) {
-      // Drop shadow behind wooden puck. The shadow-casting disc is drawn far off-screen
-      // and only its shadow is offset back into view, so no opaque black disc shows
-      // through when the puck is translucent. Shadow offsets/blur ignore the canvas
-      // transform, hence the dpr scaling.
+    if ((woodgrainOn || rockgrainOn) && fg && fg.puckCanvas) {
       var SHADOW_OFF = 10000;
-      var L = lightVec();   // shadow falls away from the light
+      var L = lightVec();
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,' + (0.45 * alpha) + ')';
       ctx.shadowBlur = r * 0.35 * dpr;
@@ -568,14 +550,11 @@
       ctx.fill();
       ctx.restore();
 
-      // Disc image from pre-rendered puck canvas
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.drawImage(fg.puckCanvas, x - r, y - r, r * 2, r * 2);
       ctx.restore();
 
-      // Live gloss: light/dark falloff across the face plus a specular hot spot that
-      // follows the light direction (which follows the device tilt)
       var gloss = Settings.get('disc_gloss');
       if (gloss > 0) {
         var ga = gloss * alpha;
@@ -614,6 +593,7 @@
     var pulseSpeed = Settings.get('pulse_speed');
     var baseRadius = Settings.get('radius');
     var woodgrainOn = Settings.bool('woodgrain_enabled');
+    var rockgrainOn = Settings.bool('rockgrain_enabled');
     var showRing = (phase === 'COUNTING') && Settings.bool('ring_enabled');
     var ringOffset = Settings.get('ring_offset');
     var ringStroke = Settings.get('ring_stroke');
@@ -629,7 +609,7 @@
         var rr = r + ringOffset;
         ctx.save();
         ctx.lineWidth = ringStroke;
-        ctx.strokeStyle = woodgrainOn ? 'rgba(255,255,255,' + ringOpacity + ')'
+        ctx.strokeStyle = (woodgrainOn || rockgrainOn) ? 'rgba(255,255,255,' + ringOpacity + ')'
                                       : rgbString(fg.color, ringOpacity);
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -713,7 +693,6 @@
         var r = baseRadius * (revealedScale + popAmount * pop);
         drawCircle(fg, fg.x, fg.y, r, fg.color, 1);
 
-        // Draw rank number
         ctx.save();
         ctx.font = 'bold ' + Math.round(r * textScale) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.fillStyle = '#FFFFFF';
@@ -754,7 +733,7 @@
   }
 
   function render(now) {
-    animFrameId = null; // Mark current frame as consumed
+    animFrameId = null;
 
     var countdownMs = Settings.get('countdown_ms');
     if (phase === 'COUNTING' && now - countdownStart >= countdownMs) {
@@ -774,6 +753,7 @@
     ctx.clearRect(0, 0, w, h);
 
     var woodgrainOn = Settings.bool('woodgrain_enabled');
+    var rockgrainOn = Settings.bool('rockgrain_enabled');
     var bgEl = document.getElementById('wood-bg');
     var winnerFg = fingers[winnerId];
     var floodActive = phase === 'RESULT' && currentMode === MODES.FIRST &&
@@ -782,7 +762,6 @@
     var grow = 0, spread = 0, discR = 0, far = 0;
     if (floodActive) {
       var e = (now - resultStart) / 1000;
-      // The disc grows on its own clock; the flood spreads on its own
       var growS = winnerGrowMs() / 1000;
       grow = easeOut((growS <= 0) ? 1 : Math.min(1, e / growS));
       var spreadS = Settings.get('flood_ms') / 1000;
@@ -801,12 +780,10 @@
       var tableGrain = currentTableGrain();
       var flood = null;
       if (floodActive && floodTable && floodGrain) {
-        // The winner's own grain spreads out from the winning disc over the table
         var grainEdge = Settings.get('flood_grain');
         tableGrain = floodTable;
         flood = {
           x: winnerFg.x, y: winnerFg.y,
-          // ends far enough out that the grain-bent front still clears every corner
           r: discR + (far + feather * (1.3 + 1.25 * grainEdge) - discR) * spread,
           feather: feather, ripple: Settings.get('wood_flood_ripple'), grain: grainEdge,
           species: floodGrain.species, seed: floodGrain.seed
@@ -819,11 +796,18 @@
         tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
         sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
       });
+    } else if (rockgrainOn && typeof RockGrainGL !== 'undefined') {
+      if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
+      if (woodBg) woodBg.draw({
+        species: getBaseRockTypeKey(), seed: 1, table: null, flood: null,
+        time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
+        tiltX: Settings.bool('wood_tilt') ? tilt.x : 0, tiltY: Settings.bool('wood_tilt') ? tilt.y : 0,
+        sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
+      });
     } else {
       if (bgEl && bgEl.style.display !== 'none') bgEl.style.display = 'none';
 
       if (floodActive) {
-        // Winner colour spreads outward from the winning disc over the background
         ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
         var Rc = discR + (far + feather - discR) * spread;
@@ -881,7 +865,6 @@
     buildTuningPanel();
   }
 
-  // --- Settings codes UI ---------------------------------------------------
   var communityCodes = [];
 
   function fallbackCopy(text) {
@@ -909,7 +892,6 @@
     }
   }
 
-  // Display only: groups of 4 so the code is easier to read and compare
   function formatCode(code) { return code.replace(/(.{4})(?=.)/g, '$1 '); }
 
   function updateCodeBox() {
@@ -925,7 +907,6 @@
     return true;
   }
 
-  // Optional plain list of codes in codes.txt (one per line). Used by Shuffle.
   function loadCommunityCodes() {
     if (!window.fetch) return;
     fetch('codes.txt', { cache: 'no-cache' })
@@ -1064,14 +1045,12 @@
     content.appendChild(box);
   }
 
-  // --- Tuning Panel Builder ---
   function buildTuningPanel() {
     var content = document.getElementById('tuning-content');
     if (!content) return;
 
     content.innerHTML = '';
 
-    // 1. GAME MODE section
     var modeHeader = document.createElement('div');
     modeHeader.className = 'panel-group-title';
     modeHeader.textContent = 'Game Mode';
@@ -1094,10 +1073,8 @@
     }
     content.appendChild(modeBox);
 
-    // Share / saved tunings (settings codes)
     buildCodesSection(content);
 
-    // 2-7 Remaining Settings Groups
     var groupOrder = ['WOOD', 'WINNER', 'AUDIO', 'COLORS', 'APPEARANCE', 'TIMING', 'SYSTEM'];
 
     groupOrder.forEach(function (groupKey) {
@@ -1166,8 +1143,15 @@
           toggle.appendChild(slider);
           cb.addEventListener('change', function () {
             if (s.key === 'woodgrain_enabled') {
-              // Woodgrain and Colors each have their own base settings
+              if (cb.checked) Settings.set('rockgrain_enabled', 0);
               Settings.applyPreset(cb.checked ? 'woodgrain' : 'colors');
+              buildTuningPanel();
+              reset();
+              return;
+            }
+            if (s.key === 'rockgrain_enabled') {
+              if (cb.checked) Settings.set('woodgrain_enabled', 0);
+              Settings.applyPreset(cb.checked ? 'stone' : 'colors');
               buildTuningPanel();
               reset();
               return;
@@ -1232,15 +1216,12 @@
     });
   }
 
-  // --- App Initialization ---
   function init() {
-    // GPU layers: live woodgrain table (#wood-bg) and winner effects (#fx)
     var woodEl = document.getElementById('wood-bg');
-    if (woodEl) { woodBg = WoodGrain.createBackground(woodEl); woodBg.onRestore = requestDraw; }
+    if (woodEl && typeof WoodGrain !== 'undefined') { woodBg = WoodGrain.createBackground(woodEl); woodBg.onRestore = requestDraw; }
     var fxEl = document.getElementById('fx');
-    if (fxEl) { fx = WoodGrain.createEffects(fxEl); fx.onRestore = requestDraw; }
+    if (fxEl && typeof WoodGrain !== 'undefined') { fx = WoodGrain.createEffects(fxEl); fx.onRestore = requestDraw; }
 
-    // Tilt lighting: iOS asks permission on the first tap, other browsers just start
     window.addEventListener('touchend', requestTiltPermission, { passive: true });
     window.addEventListener('click', requestTiltPermission, { passive: true });
     if (typeof DeviceOrientationEvent !== 'undefined' &&
@@ -1249,23 +1230,19 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Attach touch listeners to canvas
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
     canvas.addEventListener('touchmove', onTouchMove, { passive: false });
     canvas.addEventListener('touchend', onTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', onTouchCancel, { passive: false });
 
-    // Prevent iOS Safari multi-finger gesture interference (pinch zoom, rotate)
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
     document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
     document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
 
-    // Desktop mouse fallback
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
 
-    // Tune Button & Panel
     var tuneBtn = document.getElementById('tune-btn');
     var panel = document.getElementById('tuning-panel');
     var doneBtn = document.getElementById('tune-done');
@@ -1374,18 +1351,12 @@
       });
     }
 
-    // Any setting change can affect the table, discs or effects: redraw
     Settings.addChangeListener(function () { requestDraw(); updateCodeBox(); });
     loadCommunityCodes();
-
-    // Setup proactive Service Worker update checking
     setupServiceWorker();
-
-    // Start initial frame render
     requestDraw();
   }
 
-  // --- Proactive PWA Update Management ---
   var swRegistration = null;
   var waitingWorker = null;
 
@@ -1436,12 +1407,10 @@
         swRegistration = reg;
         console.log('Sortire Service Worker registered:', reg.scope);
 
-        // 1. If an updated worker is already waiting, prompt immediately
         if (reg.waiting) {
           showUpdateToast(reg.waiting);
         }
 
-        // 2. Watch for an incoming updated worker
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (!newWorker) return;
@@ -1452,10 +1421,8 @@
           });
         });
 
-        // 3. Proactively check on startup
         reg.update().catch(function () {});
 
-        // 4. Periodic check every 15 minutes while app is running
         setInterval(function () {
           reg.update().catch(function () {});
         }, 15 * 60 * 1000);
@@ -1464,14 +1431,12 @@
       });
     });
 
-    // 5. Proactively check whenever user switches back to the app / tab
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && swRegistration) {
         swRegistration.update().catch(function () {});
       }
     });
 
-    // 6. Automatically reload when the new worker takes control
     var refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (!refreshing) {

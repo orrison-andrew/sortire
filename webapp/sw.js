@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sortire-pwa-v13';
+const CACHE_NAME = 'sortire-pwa-v14';
 
 // The app can't start without these: if one is missing, install fails loudly.
 const CORE_ASSETS = [
@@ -7,6 +7,7 @@ const CORE_ASSETS = [
   './style.css',
   './codes.css',
   './woodgrain.js',
+  './rockgrain-gl.js',
   './sound.js',
   './settings.js',
   './app.js',
@@ -46,7 +47,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Allow app to trigger immediate activation
 self.addEventListener('message', (event) => {
   if (event.data && (event.data === 'SKIP_WAITING' || event.data.type === 'SKIP_WAITING')) {
     self.skipWaiting();
@@ -54,13 +54,11 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch in background to keep cache fresh (stale-while-revalidate for same-origin)
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => {

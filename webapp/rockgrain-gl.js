@@ -4,7 +4,10 @@
  * Provides WebGL-accelerated rendering for procedurally textured rock materials
  * (Granite, Marble, Slate, Sandstone, Obsidian) and irregular rock-shaped puck geometries.
  *
- * Exposes RockGrainGL.generate(rockType, size, seed, isMuted) -> <canvas>
+ * Exposes RockGrainGL.generate(rockType, size, seed, isPuck) -> <canvas>
+ *         RockGrainGL.getDiscCanvas(diameter, rockType, seed, shadeShift) -> <canvas>
+ *         RockGrainGL.createBackground(container) -> live table layer
+ *         RockGrainGL.TYPES / ROCK_TYPES / getRandomType() / getBaseColor()
  */
 (function (root) {
   'use strict';
@@ -153,6 +156,7 @@
 
   var TYPES = {
     granite: {
+      label: 'Granite',
       id: 0,
       scale: 1.5,
       colorA: [210, 205, 200], // Quartz light background
@@ -164,6 +168,7 @@
       graininess: 0.1
     },
     marble: {
+      label: 'Marble',
       id: 1,
       scale: 1.0,
       colorA: [245, 245, 248], // White calcite base
@@ -175,6 +180,7 @@
       graininess: 0.02
     },
     slate: {
+      label: 'Slate',
       id: 2,
       scale: 1.2,
       colorA: [55, 62, 68],   // Charcoal slate
@@ -186,6 +192,7 @@
       graininess: 0.04
     },
     sandstone: {
+      label: 'Sandstone',
       id: 3,
       scale: 1.4,
       colorA: [215, 170, 120], // Desert sand gold
@@ -197,6 +204,7 @@
       graininess: 0.25
     },
     obsidian: {
+      label: 'Obsidian',
       id: 4,
       scale: 0.8,
       colorA: [20, 22, 25],  // Pitch black mineral
@@ -208,6 +216,8 @@
       graininess: 0.01
     }
   };
+
+  var ROCK_TYPES = ['granite', 'marble', 'slate', 'sandstone', 'obsidian'];
 
   var state = null;
   var failed = false;
@@ -225,7 +235,8 @@
   }
 
   function init() {
-    if (state) return state;
+    if (state && state.gl && !state.gl.isContextLost()) return state;
+    state = null;
     if (failed) return null;
     try {
       var canvas = document.createElement('canvas');
@@ -257,7 +268,7 @@
       var loc = {};
       names.forEach(function (n) { loc[n] = gl.getUniformLocation(prog, n); });
 
-      state = { gl: gl, canvas: canvas, loc: loc };
+      state = { gl: gl, canvas: canvas, loc: loc, prog: prog };
       return state;
     } catch (e) {
       failed = true;
@@ -266,11 +277,137 @@
     }
   }
 
+  function rgb01(arr) { return [arr[0] / 255, arr[1] / 255, arr[2] / 255]; }
+
   function generate(typeName, size, seed, isPuck) {
     size = size || 512;
     seed = seed || 1;
     isPuck = isPuck ? 1.0 : 0.0;
 
     var st = init();
-    if (!st) return null;
-    var
+    if (!st) return flatFallback(typeName, size);
+
+    var gl = st.gl, loc = st.loc;
+    var t = TYPES[typeName] || TYPES.granite;
+
+    st.canvas.width = st.canvas.height = size;
+    gl.viewport(0, 0, size, size);
+    gl.useProgram(st.prog);
+
+    var cA = rgb01(t.colorA), cB = rgb01(t.colorB), cC = rgb01(t.colorC);
+    gl.uniform1f(loc.uSize, size);
+    gl.uniform1i(loc.uRockType, t.id);
+    gl.uniform3f(loc.uColorA, cA[0], cA[1], cA[2]);
+    gl.uniform3f(loc.uColorB, cB[0], cB[1], cB[2]);
+    gl.uniform3f(loc.uColorC, cC[0], cC[1], cC[2]);
+    gl.uniform1f(loc.uScale, t.scale);
+    gl.uniform1f(loc.uVeinWarp, t.veinWarp);
+    gl.uniform1f(loc.uRoughness, t.roughness);
+    gl.uniform1f(loc.uGraininess, t.graininess);
+    gl.uniform1f(loc.uVeinDensity, t.veinDensity);
+    gl.uniform2f(loc.uOffA, (seed * 17) % 100, (seed * 31) % 100);
+    gl.uniform2f(loc.uOffB, (seed * 43) % 100, (seed * 71) % 100);
+    gl.uniform1f(loc.uIsPuck, isPuck);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    var out = document.createElement('canvas');
+    out.width = out.height = size;
+    out.getContext('2d').drawImage(st.canvas, 0, 0);
+    return out;
+  }
+
+  function flatFallback(typeName, size) {
+    var t = TYPES[typeName] || TYPES.granite;
+    var c = document.createElement('canvas');
+    c.width = c.height = Math.min(size, 256);
+    var ctx = c.getContext('2d');
+    var gr = ctx.createLinearGradient(0, 0, 0, c.height);
+    gr.addColorStop(0, 'rgb(' + t.colorA.join(',') + ')');
+    gr.addColorStop(1, 'rgb(' + t.colorB.join(',') + ')');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+
+  var discCache = {};
+  function getDiscCanvas(diameter, typeName, seed, shadeShift) {
+    diameter = Math.max(32, diameter | 0);
+    typeName = TYPES[typeName] ? typeName : 'granite';
+    seed = (seed || 1) | 0;
+    shadeShift = shadeShift || 0;
+
+    var key = typeName + '_' + diameter + '_' + seed + '_' + shadeShift.toFixed(2);
+    if (discCache[key]) return discCache[key];
+
+    var tex = generate(typeName, diameter, seed, true);
+    var c = document.createElement('canvas');
+    c.width = c.height = diameter;
+    var ctx = c.getContext('2d');
+
+    ctx.drawImage(tex, 0, 0, diameter, diameter);
+
+    if (shadeShift !== 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atan';
+      ctx.fillStyle = shadeShift < 0
+        ? 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')'
+        : 'rgba(255,255,255,' + Math.min(0.6, shadeShift).toFixed(3) + ')';
+      ctx.fillRect(0, 0, diameter, diameter);
+      ctx.restore();
+    }
+
+    discCache[key] = c;
+    return c;
+  }
+
+  function createBackground(container) {
+    var cv = document.createElement('canvas');
+    cv.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
+    container.innerHTML = '';
+    container.appendChild(cv);
+
+    var L = { available: true };
+    L.draw = function (s) {
+      var w = container.offsetWidth || window.innerWidth;
+      var h = container.offsetHeight || window.innerHeight;
+      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+      var ctx = cv.getContext('2d');
+      var t = TYPES[s.species] || TYPES.granite;
+      ctx.fillStyle = 'rgb(' + t.colorA.join(',') + ')';
+      ctx.fillRect(0, 0, w, h);
+      return true;
+    };
+    return L;
+  }
+
+  function getTypeKey(index) {
+    index = Math.max(0, Math.min(ROCK_TYPES.length - 1, index | 0));
+    return ROCK_TYPES[index];
+  }
+
+  function getBaseColor(name) {
+    var t = TYPES[name] || TYPES.granite;
+    return {
+      r: Math.round((t.colorA[0] + t.colorB[0]) / 2),
+      g: Math.round((t.colorA[1] + t.colorB[1]) / 2),
+      b: Math.round((t.colorA[2] + t.colorB[2]) / 2)
+    };
+  }
+
+  function getRandomType() {
+    return ROCK_TYPES[Math.floor(Math.random() * ROCK_TYPES.length)];
+  }
+
+  root.RockGrainGL = {
+    TYPES: TYPES,
+    ROCK_TYPES: ROCK_TYPES,
+    generate: generate,
+    getDiscCanvas: getDiscCanvas,
+    createBackground: createBackground,
+    getTypeKey: getTypeKey,
+    getBaseColor: getBaseColor,
+    getRandomType: getRandomType
+  };
+
+})(typeof window !== 'undefined' ? window : this);

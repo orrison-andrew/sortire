@@ -10,7 +10,7 @@
 
   var GROUPS = {
     MODE: { title: 'Game Mode' },
-    WOOD: { title: 'Woodgrain' },
+    WOOD: { title: 'Woodgrain & Stone' },
     WINNER: { title: 'Winner Options' },
     AUDIO: { title: 'Audio & Feedback' },
     COLORS: { title: 'Color Controls' },
@@ -22,9 +22,11 @@
   // Schema defaults are the PLAIN look: flat colours, no pulse, no marker, no winner
   // effects. PRESETS.colors below is built from these.
   var SETTINGS_SCHEMA = [
-    // Woodgrain
+    // Woodgrain & Stone
     { key: 'woodgrain_enabled', group: 'WOOD', label: 'Enable woodgrain style', def: 0, isBool: true, resetsRound: true },
     { key: 'wood_type', group: 'WOOD', label: 'Wood species', def: 3, min: 0, max: 11, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart', 'Cherry', 'Pine', 'Mahogany', 'Padauk', 'Zebrawood', 'Yellowheart'], resetsRound: true },
+    { key: 'rockgrain_enabled', group: 'WOOD', label: 'Enable stone style', def: 0, isBool: true, resetsRound: true },
+    { key: 'rock_type', group: 'WOOD', label: 'Stone material', def: 0, min: 0, max: 4, step: 1, options: ['Granite', 'Marble', 'Slate', 'Sandstone', 'Obsidian'], resetsRound: true },
     { key: 'wood_vignette', group: 'WOOD', label: 'Table vignette', def: 0.28, min: 0, max: 0.6, step: 0.02 },
     { key: 'wood_sheen', group: 'WOOD', label: 'Varnish sheen', def: 0.5, min: 0, max: 1, step: 0.05 },
     { key: 'wood_sheen_anim', group: 'WOOD', label: 'Animate sheen and edge ripple', def: 1, isBool: true },
@@ -93,9 +95,6 @@
     { key: 'hint_opacity', group: 'SYSTEM', label: 'Hint text opacity', def: 0.7, min: 0, max: 1, step: 0.05 }
   ];
 
-  // Two COMPLETE base configurations. Toggling "Enable woodgrain style" applies one of
-  // them (see applyPreset), so each must set every setting that the other changes.
-  // Both start from the schema defaults (the plain look) and override only what differs.
   var PLAIN = {};
   SETTINGS_SCHEMA.forEach(function (s) { PLAIN[s.key] = s.def; });
 
@@ -107,29 +106,32 @@
   }
 
   var PRESETS = {
-    // Plain: flat colours, nothing extra. Identical to the schema defaults.
     colors: presetFrom({}),
-    // Woodgrain: the tuning behind code 01349B949C9180321266084D123CE89E5928000F079C5930C540E6FA9C5C
-    // (that code predates the "Winner grows" switch; there grow time 0 meant off, which is
-    // what winner_grow: 0 means here).
     woodgrain: presetFrom({
       woodgrain_enabled: 1,
       wood_sheen_anim: 0,
       disc_gloss: 0.35,
       wood_flood_ripple: 0.2,
-      winner_grow: 0,         // winner appears instantly
+      winner_grow: 0,
+      fx_shockwave: 1,
+      fx_particles: 0
+    }),
+    stone: presetFrom({
+      rockgrain_enabled: 1,
+      wood_sheen_anim: 0,
+      disc_gloss: 0.35,
+      wood_flood_ripple: 0.2,
+      winner_grow: 0,
       fx_shockwave: 1,
       fx_particles: 0
     })
   };
 
-  // Bump when defaults change so devices with older saved values pick up the new ones once.
-  var SETTINGS_VERSION = '4';
+  var SETTINGS_VERSION = '5';
 
   var values = {};
   var listeners = [];
 
-  // localStorage can throw (private mode, disabled storage): never let that break the app
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
@@ -254,32 +256,8 @@
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  //  CODE FORMAT
-  // ═══════════════════════════════════════════════════════════════════════
-  // A settings code is a hex string:
-  //
-  //   [format:1 byte][field count:1 byte][packed values...][crc8:1 byte]
-  //
-  // Every setting is stored as a small integer q = round((value - min) / step) in the
-  // fewest bits that fit its range, packed MSB-first in the order of CODE_FIELDS.
-  //
-  // RULES (these are what make "old codes always work"):
-  //   1. CODE_FIELDS is APPEND-ONLY. Never reorder, edit or delete an entry. A new
-  //      setting goes on the END. If a range must change, add a new entry and stop
-  //      using the old one.
-  //   2. The field count is inside the code, so a code made before a setting existed
-  //      simply lacks it, and the missing setting gets its default when applied.
-  //   3. A code made by a newer app (more fields) still decodes here: unknown trailing
-  //      fields are ignored.
-  //   4. If the layout itself ever has to change, bump CODE_FORMAT and keep a decoder
-  //      for the old format.
-  //
-  // tools/settings-codec.test.js checks a "golden" code so a slip breaks the test
-  // instead of breaking people's saved codes.
   var CODE_FORMAT = 1;
 
-  // [key, min, max, step]  (frozen copy of each setting's range, independent of the UI schema)
   var CODE_FIELDS = [
     ['woodgrain_enabled', 0, 1, 1],
     ['wood_type', 0, 11, 1],
@@ -334,7 +312,9 @@
     ['hint_opacity', 0, 1, 0.05],
     ['winner_grow', 0, 1, 1],
     ['flood_ms', 0, 3000, 50],
-    ['flood_grain', 0, 1, 0.05]
+    ['flood_grain', 0, 1, 0.05],
+    ['rockgrain_enabled', 0, 1, 1],
+    ['rock_type', 0, 4, 1]
   ];
 
   function fieldCount(f) { return Math.round((f[2] - f[1]) / f[3]); }
@@ -360,7 +340,6 @@
     return bytes.map(function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('').toUpperCase();
   }
 
-  // getter(key) -> number. Defaults to the live settings.
   function encode(getter) {
     getter = getter || get;
     var bytes = [CODE_FORMAT, CODE_FIELDS.length];
@@ -379,7 +358,6 @@
     return toHex(bytes);
   }
 
-  // Returns { ok, error?, values?, count?, newer?, missing? }. Never throws, never applies.
   function decode(str) {
     var h = String(str == null ? '' : str).replace(/[\s\-_:]/g, '');
     if (!h) return { ok: false, error: 'Nothing to import' };
@@ -414,7 +392,6 @@
 
   function currentCode() { return encode(get); }
 
-  // Apply a code: settings the code does not carry (it predates them) get their defaults.
   function applyCode(str) {
     var d = decode(str);
     if (!d.ok) return d;
@@ -429,7 +406,6 @@
 
   function defaultCode() { return encode(function (k) { var s = schemaFor(k); return s ? s.def : 0; }); }
 
-  // Dev guard: warn if the UI schema drifted away from the frozen code fields
   function checkCodeFields() {
     var seen = {};
     CODE_FIELDS.forEach(function (f) { seen[f[0]] = f; });
@@ -444,9 +420,6 @@
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  //  Saved codes (your own list, with names)
-  // ═══════════════════════════════════════════════════════════════════════
   var SAVED_KEY = 'sortire_saved_codes';
 
   function listSaved() {
@@ -460,7 +433,6 @@
 
   function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  // Returns { ok, entry } or { ok:false, error, existing? }
   function saveCode(name, code) {
     code = String(code || '').replace(/[\s\-_:]/g, '').toUpperCase();
     var d = decode(code);
@@ -502,7 +474,6 @@
     dumpJson: dumpJson,
     importJson: importJson,
     addChangeListener: addChangeListener,
-    // codes
     CODE_FORMAT: CODE_FORMAT,
     CODE_FIELDS: CODE_FIELDS,
     encode: encode,
@@ -510,7 +481,6 @@
     currentCode: currentCode,
     defaultCode: defaultCode,
     applyCode: applyCode,
-    // saved codes
     listSaved: listSaved,
     saveCode: saveCode,
     renameSaved: renameSaved,
