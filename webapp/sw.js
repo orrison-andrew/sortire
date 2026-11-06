@@ -1,6 +1,5 @@
-const CACHE_NAME = 'sortire-pwa-v15';
+const CACHE_NAME = 'sortire-pwa-v16';
 
-// The app can't start without these: if one is missing, install fails loudly.
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -10,6 +9,8 @@ const CORE_ASSETS = [
   './rockgrain-gl.js',
   './sound.js',
   './settings.js',
+  './surface-mode.js',
+  './table.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -18,7 +19,6 @@ const CORE_ASSETS = [
   './icons/icon.svg'
 ];
 
-// Nice to have. A missing file here must never break installing the app.
 const OPTIONAL_ASSETS = [
   './codes.txt'
 ];
@@ -72,7 +72,7 @@ self.addEventListener('fetch', (event) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+            cache.put(event.request, networkResponse);
           });
         }
         return networkResponse;

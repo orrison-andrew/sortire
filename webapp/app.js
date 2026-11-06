@@ -1,6 +1,6 @@
 /**
  * app.js: Main application logic and canvas renderer for Sortire PWA.
- * Fully mirrors Android ArenaView, MainActivity, and Palette with 60/120fps canvas rendering.
+ * Uses TableManager and SurfaceMode for unified surface and arena rendering.
  */
 (function () {
   'use strict';
@@ -177,8 +177,6 @@
     requestDraw();
   }
 
-  var woodBg = null;
-  var rockBg = null;
   var fx = null;
   var floodTable = null;
   var floodGrain = null;
@@ -319,7 +317,11 @@
       if (w) {
         floodBase = currentBackgroundColor();
         floodTable = currentTableGrain();
-        floodGrain = { species: w.discSpecies, seed: Math.floor(Math.random() * 100000) + 1 };
+        floodGrain = {
+          species: w.discSpecies,
+          rockType: w.discRockType,
+          seed: Math.floor(Math.random() * 100000) + 1
+        };
         lastWinnerColor = w.color;
         lastWinnerWood  = floodGrain.species;
         lastWinnerSeed  = floodGrain.seed;
@@ -555,28 +557,6 @@
       ctx.globalAlpha = alpha;
       ctx.drawImage(fg.puckCanvas, x - r, y - r, r * 2, r * 2);
       ctx.restore();
-
-      var gloss = Settings.get('disc_gloss');
-      if (gloss > 0 && woodgrainOn) {
-        var ga = gloss * alpha;
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.clip();
-        var lg = ctx.createLinearGradient(x + L.x * r, y + L.y * r, x - L.x * r, y - L.y * r);
-        lg.addColorStop(0,   'rgba(255,255,255,' + (0.22 * ga).toFixed(3) + ')');
-        lg.addColorStop(0.5, 'rgba(255,255,255,0)');
-        lg.addColorStop(1,   'rgba(0,0,0,' + (0.18 * ga).toFixed(3) + ')');
-        ctx.fillStyle = lg;
-        ctx.fillRect(x - r, y - r, r * 2, r * 2);
-        var hx = x + L.x * r * 0.5, hy = y + L.y * r * 0.5;
-        var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 0.55);
-        hg.addColorStop(0, 'rgba(255,255,255,' + (0.30 * ga).toFixed(3) + ')');
-        hg.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = hg;
-        ctx.fillRect(x - r, y - r, r * 2, r * 2);
-        ctx.restore();
-      }
     } else {
       ctx.save();
       ctx.fillStyle = rgbString(color, alpha);
@@ -753,9 +733,6 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    var woodgrainOn = Settings.bool('woodgrain_enabled');
-    var rockgrainOn = Settings.bool('rockgrain_enabled');
-    var bgEl = document.getElementById('wood-bg');
     var winnerFg = fingers[winnerId];
     var floodActive = phase === 'RESULT' && currentMode === MODES.FIRST &&
                       Settings.bool('winner_flood') && !!winnerFg;
@@ -776,40 +753,32 @@
       ) + 2;
     }
 
-    if (woodgrainOn) {
-      if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
+    var activeMode = SurfaceMode.getActiveMode();
+    if (activeMode !== SurfaceMode.MODES.COLOR) {
       var tableGrain = currentTableGrain();
       var flood = null;
-      if (floodActive && floodTable && floodGrain) {
+      if (floodActive && floodGrain) {
         var grainEdge = Settings.get('flood_grain');
-        tableGrain = floodTable;
         flood = {
           x: winnerFg.x, y: winnerFg.y,
-          r: discR + (far + feather * (1.3 + 1.25 * grainEdge) - discR) * spread,
+          r: discR + (far + feather * 1.5 - discR) * spread,
           feather: feather, ripple: Settings.get('wood_flood_ripple'), grain: grainEdge,
-          species: floodGrain.species, seed: floodGrain.seed
+          species: floodGrain.species || floodGrain.rockType, seed: floodGrain.seed
         };
       }
       var tiltOn = Settings.bool('wood_tilt');
-      if (woodBg) woodBg.draw({
-        species: tableGrain.species, seed: tableGrain.seed, table: null, flood: flood,
+      TableManager.draw({
+        species: tableGrain.species,
+        rockType: getBaseRockTypeKey(),
+        seed: tableGrain.seed,
+        flood: flood,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
         tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
-        sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
-      });
-    } else if (rockgrainOn && typeof RockGrainGL !== 'undefined') {
-      if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
-      if (!rockBg && bgEl) rockBg = RockGrainGL.createBackground(bgEl);
-      var tiltOn = Settings.bool('wood_tilt');
-      if (rockBg) rockBg.draw({
-        species: getBaseRockTypeKey(), seed: bgSeed,
-        time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
-        tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
-        sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
+        sheen: Settings.get('wood_sheen'),
+        vignette: Settings.get('wood_vignette')
       });
     } else {
-      if (bgEl && bgEl.style.display !== 'none') bgEl.style.display = 'none';
-
+      TableManager.draw({});
       if (floodActive) {
         ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
@@ -1146,15 +1115,13 @@
           toggle.appendChild(slider);
           cb.addEventListener('change', function () {
             if (s.key === 'woodgrain_enabled') {
-              if (cb.checked) Settings.set('rockgrain_enabled', 0);
-              Settings.applyPreset(cb.checked ? 'woodgrain' : 'colors');
+              SurfaceMode.setActiveMode(cb.checked ? SurfaceMode.MODES.WOOD : SurfaceMode.MODES.COLOR);
               buildTuningPanel();
               reset();
               return;
             }
             if (s.key === 'rockgrain_enabled') {
-              if (cb.checked) Settings.set('woodgrain_enabled', 0);
-              Settings.applyPreset(cb.checked ? 'stone' : 'colors');
+              SurfaceMode.setActiveMode(cb.checked ? SurfaceMode.MODES.STONE : SurfaceMode.MODES.COLOR);
               buildTuningPanel();
               reset();
               return;
@@ -1221,10 +1188,14 @@
 
   function init() {
     var woodEl = document.getElementById('wood-bg');
-    if (woodEl && typeof WoodGrain !== 'undefined') { woodBg = WoodGrain.createBackground(woodEl); woodBg.onRestore = requestDraw; }
-    if (woodEl && typeof RockGrainGL !== 'undefined') { rockBg = RockGrainGL.createBackground(woodEl); }
+    if (woodEl) {
+      TableManager.init(woodEl);
+    }
     var fxEl = document.getElementById('fx');
-    if (fxEl && typeof WoodGrain !== 'undefined') { fx = WoodGrain.createEffects(fxEl); fx.onRestore = requestDraw; }
+    if (fxEl && typeof WoodGrain !== 'undefined') {
+      fx = WoodGrain.createEffects(fxEl);
+      fx.onRestore = requestDraw;
+    }
 
     window.addEventListener('touchend', requestTiltPermission, { passive: true });
     window.addEventListener('click', requestTiltPermission, { passive: true });

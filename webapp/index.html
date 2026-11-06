@@ -23,24 +23,21 @@
   <link rel="stylesheet" href="codes.css">
 </head>
 <body>
-  <!-- GPU tabletop (WebGL canvas created inside by woodgrain.js / rockgrain-gl.js) -->
+  <!-- GPU tabletop -->
   <div id="wood-bg" aria-hidden="true"></div>
 
   <canvas id="arena"></canvas>
 
-  <!-- GPU winner effects (shockwave, glow, particles) -->
+  <!-- GPU winner effects -->
   <canvas id="fx" aria-hidden="true"></canvas>
 
-  <!-- Top-Right Settings Gear Icon (tap again to close the drawer) -->
   <button id="tune-btn" type="button" aria-label="Settings">⚙</button>
 
-  <!-- Update Ready Toast Pill -->
   <div id="update-toast" class="update-toast" role="alert" aria-live="polite">
     <span id="update-msg">New version available</span>
     <button id="update-btn" type="button">Update</button>
   </div>
 
-  <!-- Full Settings Drawer Panel -->
   <div id="tuning-panel" aria-modal="true" role="dialog">
     <div class="panel-header">
       <h2>Settings</h2>
@@ -55,7 +52,6 @@
     <div id="tuning-content"></div>
   </div>
 
-  <!-- Import Modal: settings code (or JSON) -->
   <div id="import-modal" class="modal-backdrop">
     <div class="modal-box">
       <h3>Import Settings</h3>
@@ -71,6 +67,8 @@
   <script src="rockgrain-gl.js"></script>
   <script src="sound.js"></script>
   <script src="settings.js"></script>
+  <script src="surface-mode.js"></script>
+  <script src="table.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
