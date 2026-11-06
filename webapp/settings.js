@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var SETTINGS_VERSION = '9';
+  var SETTINGS_VERSION = '10';
 
   // Dropdown labels come from the material modules so they can never drift out of order.
   function labelsFrom(mod) {
@@ -81,7 +81,7 @@
   ];
 
   var GROUPS = {
-    WOOD: { title: 'Surfaces & Materials' },
+    WOOD: { title: 'Material & Lighting' },
     WINNER: { title: 'Winner Actions' },
     AUDIO: { title: 'Audio & Haptics' },
     COLORS: { title: 'Colors & Background' },
@@ -90,21 +90,153 @@
     SYSTEM: { title: 'System' }
   };
 
-  var state = {};
-  var listeners = [];
 
-  // Wood and stone surfaces are mutually exclusive (wood wins if both are set)
-  function normalizeSurface() {
-    if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
+  // ── Surfaces & per-surface profiles ───────────────────────────────────────
+  // Three surfaces (Color / Wood / Stone). Each keeps its OWN values for the
+  // "surface" settings (materials, lighting, winner effects, colours, finger look);
+  // audio, timing and instruction-text settings are shared by all surfaces.
+  var SURFACES = ['COLOR', 'WOOD', 'STONE'];
+  var DEFAULT_SURFACE = 'WOOD';
+  var SURFACE_GROUPS = { WOOD: 1, WINNER: 1, COLORS: 1, APPEARANCE: 1 };
+
+  // Built-in default tunings (exported from the app). Stone starts from the wood one.
+  var DEFAULT_CODES = {
+    WOOD:  'RA7R3EKDQYRBQ47XXYXSWBDPAAUSCHJGUIGQHKOIYYUMA',
+    COLOR: 'QS7R3EKDQ4SBQ47XXYXSWBDPGOUSCXQGUIGQHKOIYYUMA'
+  };
+
+  function isFlag(key) { return key === 'woodgrain_enabled' || key === 'rockgrain_enabled'; }
+
+  // Which surfaces show which rows (everything else shows everywhere)
+  SETTINGS_SCHEMA.forEach(function (s) {
+    if (isFlag(s.key)) s.hidden = true;                       // replaced by the Surface selector
+    else if (s.key === 'wood_type') s.modes = ['WOOD'];
+    else if (s.key === 'rock_type') s.modes = ['STONE'];
+    else if (/^(wood_tilt|wood_sheen_anim|wood_sheen|wood_vignette|wood_flood_ripple|flood_grain)$/.test(s.key)) s.modes = ['WOOD', 'STONE'];
+    else if (s.group === 'COLORS' || /^marker_/.test(s.key)) s.modes = ['COLOR'];
+    s.perSurface = !isFlag(s.key) && !!SURFACE_GROUPS[s.group] && s.key.indexOf('hint_') !== 0;
+  });
+
+  var SURFACE_KEYS = SETTINGS_SCHEMA.filter(function (s) { return s.perSurface; }).map(function (s) { return s.key; });
+
+  function schemaDef(key) {
+    for (var i = 0; i < SETTINGS_SCHEMA.length; i++) if (SETTINGS_SCHEMA[i].key === key) return SETTINGS_SCHEMA[i].def;
+    return 0;
   }
 
-  // Named bundles of settings applied when the surface mode changes.
-  // Empty bundles are deliberate: switching surface keeps the user's tuning.
-  var PRESETS = {
-    woodgrain: {},
-    stone: {},
-    colors: { marker_enabled: 1, ring_enabled: 1 }
-  };
+  var state = {};
+  var profiles = {};     // surface -> { key: value } for SURFACE_KEYS
+  var listeners = [];
+
+  function modeOf(st) {
+    return st.woodgrain_enabled ? 'WOOD' : st.rockgrain_enabled ? 'STONE' : 'COLOR';
+  }
+  function currentMode() { return modeOf(state); }
+
+  function setFlags(mode) {
+    state.woodgrain_enabled = mode === 'WOOD' ? 1 : 0;
+    state.rockgrain_enabled = mode === 'STONE' ? 1 : 0;
+  }
+
+  function pickSurface() {
+    var p = {};
+    SURFACE_KEYS.forEach(function (k) { p[k] = get(k); });
+    return p;
+  }
+
+  function defaultProfile(mode) {
+    var r = decode(DEFAULT_CODES[mode === 'COLOR' ? 'COLOR' : 'WOOD']);
+    var p = {};
+    SURFACE_KEYS.forEach(function (k) {
+      p[k] = (r.ok && r.data[k] !== undefined) ? r.data[k] : schemaDef(k);
+    });
+    // The winner marker ring belongs to the flat colour look only
+    if (mode !== 'COLOR') p.marker_enabled = 0;
+    return p;
+  }
+
+  function applyProfile(mode) {
+    var def = defaultProfile(mode);
+    var p = profiles[mode] || {};
+    SURFACE_KEYS.forEach(function (k) { state[k] = p[k] !== undefined ? p[k] : def[k]; });
+    profiles[mode] = pickSurface();
+  }
+
+  function notify(key, value) { listeners.forEach(function (cb) { cb(key, value); }); }
+
+  function load() {
+    var v = localStorage.getItem('sortire_settings_v');
+    var s = localStorage.getItem('sortire_settings_json');
+    var p = localStorage.getItem('sortire_profiles_json');
+    if (v === SETTINGS_VERSION && s) {
+      try {
+        var parsed = JSON.parse(s);
+        SETTINGS_SCHEMA.forEach(function (schema) {
+          state[schema.key] = parsed[schema.key] !== undefined ? parsed[schema.key] : schema.def;
+        });
+        profiles = p ? JSON.parse(p) : {};
+        if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
+        profiles[currentMode()] = pickSurface();
+        return;
+      } catch (e) {}
+    }
+    resetAll();
+  }
+
+  function save() {
+    profiles[currentMode()] = pickSurface();
+    localStorage.setItem('sortire_settings_v', SETTINGS_VERSION);
+    localStorage.setItem('sortire_settings_json', JSON.stringify(state));
+    localStorage.setItem('sortire_profiles_json', JSON.stringify(profiles));
+  }
+
+  // Everything back to defaults; the current surface stays selected
+  function resetAll() {
+    var mode = (state.woodgrain_enabled !== undefined) ? currentMode() : DEFAULT_SURFACE;
+    SETTINGS_SCHEMA.forEach(function (s) { state[s.key] = s.def; });
+    profiles = {};
+    SURFACES.forEach(function (m) { profiles[m] = defaultProfile(m); });
+    setFlags(mode);
+    applyProfile(mode);
+    save();
+    notify('all', null);
+  }
+
+  // Switch surface: park the current surface's values, load the new surface's own
+  function setMode(mode) {
+    if (SURFACES.indexOf(mode) < 0) return;
+    if (currentMode() === mode) return;
+    profiles[currentMode()] = pickSurface();
+    setFlags(mode);
+    applyProfile(mode);
+    save();
+    notify('all', null);
+  }
+
+  function get(key) {
+    if (state[key] !== undefined) return state[key];
+    return schemaDef(key);
+  }
+
+  function bool(key) { return get(key) !== 0; }
+
+  function set(key, value) {
+    state[key] = value;
+    save();
+    notify(key, value);
+  }
+
+  function format(schema, val) {
+    if (schema.options) return schema.options[Math.round(val)];
+    var out = Number.isInteger(schema.step) ? Math.round(val).toString() : val.toFixed(2);
+    return schema.unit ? out + schema.unit : out;
+  }
+
+  // ── Codes ─────────────────────────────────────────────────────────────────
+  // A code describes ONE surface's tuning. Shared settings (audio, timing, hints)
+  // are written as defaults, so the same tuning always gives the same code and
+  // applying a code never touches your sound or timing.
+  var CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // base32
 
   // Compression scheme mapping names to bounds. Max ranges must fit the exact values below.
   var CODE_FIELDS = [
@@ -165,72 +297,22 @@
     ['order_pending_alpha', 0, 1.0, 0.05]
   ];
 
-  function load() {
-    var v = localStorage.getItem('sortire_settings_v');
-    var s = localStorage.getItem('sortire_settings_json');
-    if (v === SETTINGS_VERSION && s) {
-      try {
-        var parsed = JSON.parse(s);
-        SETTINGS_SCHEMA.forEach(function (schema) {
-          state[schema.key] = parsed[schema.key] !== undefined ? parsed[schema.key] : schema.def;
-        });
-        normalizeSurface();
-        return;
-      } catch (e) {}
-    }
-    resetAll();
-  }
-
-  function save() {
-    localStorage.setItem('sortire_settings_v', SETTINGS_VERSION);
-    localStorage.setItem('sortire_settings_json', JSON.stringify(state));
-  }
-
-  function resetAll() {
-    SETTINGS_SCHEMA.forEach(function (s) { state[s.key] = s.def; });
-    save();
-  }
-
-  function get(key) {
-    if (state[key] !== undefined) return state[key];
-    for (var i = 0; i < SETTINGS_SCHEMA.length; i++) {
-      if (SETTINGS_SCHEMA[i].key === key) return SETTINGS_SCHEMA[i].def;
-    }
-    return 0;
-  }
-
-  function bool(key) { return get(key) !== 0; }
-
-  function set(key, value) {
-    state[key] = value;
-    save();
-    listeners.forEach(function (cb) { cb(key, value); });
-  }
-
-  function format(schema, val) {
-    if (schema.options) return schema.options[Math.round(val)];
-    var out = Number.isInteger(schema.step) ? Math.round(val).toString() : val.toFixed(2);
-    return schema.unit ? out + schema.unit : out;
-  }
-
-  var CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // base32
 
   function encode() {
     var valList = [];
     CODE_FIELDS.forEach(function (f) {
       var k = f[0], min = f[1], max = f[2], step = f[3];
-      var val = Math.max(min, Math.min(max, get(k)));
+      var raw = (SURFACE_KEYS.indexOf(k) >= 0 || isFlag(k)) ? get(k) : schemaDef(k);
+      var val = Math.max(min, Math.min(max, raw));
       valList.push(Math.round((val - min) / step));
     });
-    
+
     var bits = [];
     CODE_FIELDS.forEach(function (f, i) {
       var maxSteps = Math.round((f[2] - f[1]) / f[3]);
       var neededBits = Math.max(1, Math.ceil(Math.log2(maxSteps + 1)));
       var v = valList[i];
-      for (var b = 0; b < neededBits; b++) {
-        bits.push((v >> b) & 1);
-      }
+      for (var b = 0; b < neededBits; b++) bits.push((v >> b) & 1);
     });
 
     var str = '';
@@ -248,9 +330,9 @@
     str = str.replace(/[^A-Z2-7]/gi, '').toUpperCase();
     var bits = [];
     for (var i = 0; i < str.length; i++) {
-      var idx = CODE_CHARS.indexOf(str[i]);
-      if (idx < 0) return { ok: false, error: 'Invalid character' };
-      for (var j = 0; j < 5; j++) bits.push((idx >> j) & 1);
+      var ci = CODE_CHARS.indexOf(str[i]);
+      if (ci < 0) return { ok: false, error: 'Invalid character' };
+      for (var j = 0; j < 5; j++) bits.push((ci >> j) & 1);
     }
 
     var idx = 0;
@@ -260,73 +342,88 @@
       var key = f[0], min = f[1], max = f[2], step = f[3];
       var maxSteps = Math.round((max - min) / step);
       var neededBits = Math.max(1, Math.ceil(Math.log2(maxSteps + 1)));
-      
+
       var v = 0;
       for (var b = 0; b < neededBits; b++) {
         if (idx < bits.length && bits[idx]) v |= (1 << b);
         idx++;
       }
       if (v > maxSteps) v = maxSteps;
-      result[key] = min + v * step;
+      result[key] = Math.round((min + v * step) * 1e6) / 1e6;
     }
     return { ok: true, data: result };
   }
 
+  function modeOfCode(str) {
+    var r = decode(str);
+    return r.ok ? modeOf(r.data) : null;
+  }
+
+  // Apply a tuning: switches to the code's surface and replaces only that surface's values
   function applyCode(str) {
     var r = decode(str);
     if (!r.ok) return r;
-    var st = r.data;
-    SETTINGS_SCHEMA.forEach(function (s) {
-      if (st[s.key] !== undefined) state[s.key] = st[s.key];
+    profiles[currentMode()] = pickSurface();
+    var mode = modeOf(r.data);
+    setFlags(mode);
+    SURFACE_KEYS.forEach(function (k) {
+      if (r.data[k] !== undefined) state[k] = r.data[k];
     });
-    normalizeSurface();
     save();
-    listeners.forEach(function (cb) { cb('all', null); });
+    notify('all', null);
     return { ok: true };
   }
 
-  function applyPreset(name) {
-    var p = PRESETS[name];
-    if (!p) return;
-    for (var k in p) set(k, p[k]);
-  }
-
-  function dumpJson() { return JSON.stringify(state, null, 2); }
+  // ── JSON backup (everything, including every surface's profile) ───────────
+  function dumpJson() { save(); return JSON.stringify({ state: state, profiles: profiles }, null, 2); }
   function importJson(txt) {
     try {
-      var st = JSON.parse(txt);
+      var parsed = JSON.parse(txt);
+      var st = parsed.state || parsed;               // also accepts the old flat format
       SETTINGS_SCHEMA.forEach(function (s) {
         if (st[s.key] !== undefined) state[s.key] = st[s.key];
       });
-      normalizeSurface();
+      if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
+      if (parsed.profiles) {
+        SURFACES.forEach(function (m) { if (parsed.profiles[m]) profiles[m] = parsed.profiles[m]; });
+        applyProfile(currentMode());
+      }
       save();
-      listeners.forEach(function (cb) { cb('all', null); });
+      notify('all', null);
       return true;
-    } catch(e) { return false; }
+    } catch (e) { return false; }
   }
 
-  function listSaved() {
+  // ── Saved tunings (each belongs to one surface) ───────────────────────────
+  function allSaved() {
     try {
       return JSON.parse(localStorage.getItem('sortire_saved_tunings')) || [];
-    } catch(e) { return []; }
+    } catch (e) { return []; }
+  }
+  function writeSaved(l) { localStorage.setItem('sortire_saved_tunings', JSON.stringify(l)); }
+
+  function listSaved(mode) {
+    return allSaved().map(function (x) {
+      x.mode = x.mode || modeOfCode(x.code);
+      return x;
+    }).filter(function (x) { return !mode || x.mode === mode; });
   }
 
   function saveCode(name, code) {
-    var l = listSaved();
-    l.push({ id: Date.now().toString(), name: name, code: code });
-    localStorage.setItem('sortire_saved_tunings', JSON.stringify(l));
+    var l = allSaved();
+    l.push({ id: Date.now().toString(), name: name, code: code, mode: modeOfCode(code) });
+    writeSaved(l);
     return { ok: true };
   }
 
   function deleteSaved(id) {
-    var l = listSaved().filter(function(x) { return x.id !== id; });
-    localStorage.setItem('sortire_saved_tunings', JSON.stringify(l));
+    writeSaved(allSaved().filter(function (x) { return x.id !== id; }));
   }
-  
+
   function renameSaved(id, name) {
-    var l = listSaved();
-    var f = l.find(function(x) { return x.id === id; });
-    if (f) { f.name = name; localStorage.setItem('sortire_saved_tunings', JSON.stringify(l)); }
+    var l = allSaved();
+    var f = l.filter(function (x) { return x.id === id; })[0];
+    if (f) { f.name = name; writeSaved(l); }
   }
 
   load();
@@ -334,17 +431,20 @@
   window.Settings = {
     SCHEMA: SETTINGS_SCHEMA,
     GROUPS: GROUPS,
+    SURFACES: SURFACES,
     get: get,
     bool: bool,
     set: set,
     resetAll: resetAll,
+    getMode: currentMode,
+    setMode: setMode,
     format: format,
     currentCode: encode,
-    decode: decode,
-    applyCode: applyCode,
     dump: encode,
+    decode: decode,
+    modeOfCode: modeOfCode,
+    applyCode: applyCode,
     dumpJson: dumpJson,
-    applyPreset: applyPreset,
     importJson: importJson,
     listSaved: listSaved,
     saveCode: saveCode,

@@ -14,17 +14,19 @@
 
   var TAU = Math.PI * 2;
 
-  // Seeded pebble outline: a slightly squashed, rotated ellipse with a few low
-  // harmonic lumps. Same seed -> same pebble. Fits inside radius r.
-  function pebblePath(r, rand) {
+  // Seeded pebble outline: a squashed, rotated ellipse with lumps from a few low
+  // harmonics. Same seed -> same pebble. Scaled to the SAME AREA as a nominal disc of
+  // radius r (so pebbles read as the same size as other discs), then limited so it
+  // fits inside the padded canvas of half-size rc.
+  function pebblePath(r, rc, rand) {
     var N = 72;
-    var squash = 0.72 + rand() * 0.24;          // minor / major axis
+    var squash = 0.62 + rand() * 0.28;           // minor / major axis: 0.62 .. 0.90
     var rot = rand() * TAU;
     var harmonics = [];
     for (var k = 2; k <= 5; k++) {
-      harmonics.push({ k: k, amp: (0.09 / (k - 1)) * (0.3 + rand() * 0.7), ph: rand() * TAU });
+      harmonics.push({ k: k, amp: (0.16 / (k - 1)) * (0.35 + rand() * 0.65), ph: rand() * TAU });
     }
-    var pts = [], maxD = 0, i;
+    var pts = [], maxD = 0, area = 0, i;
     for (i = 0; i < N; i++) {
       var th = i / N * TAU;
       var rad = 1;
@@ -35,8 +37,14 @@
       pts.push([px, py]);
       maxD = Math.max(maxD, Math.hypot(px, py));
     }
-    var s = (r * 0.96 - 1) / maxD;               // keep the rim stroke inside the canvas
-    pts = pts.map(function (p) { return [r + p[0] * s, r + p[1] * s]; });
+    for (i = 0; i < N; i++) {
+      var a0 = pts[i], a1 = pts[(i + 1) % N];
+      area += a0[0] * a1[1] - a1[0] * a0[1];
+    }
+    var meanR = Math.sqrt(Math.abs(area) / 2 / Math.PI);
+    var s = (r * 0.97) / meanR;
+    s = Math.min(s, (rc * 0.96 - 1) / maxD);      // keep the rim stroke inside the canvas
+    pts = pts.map(function (p) { return [rc + p[0] * s, rc + p[1] * s]; });
 
     return function trace(ctx) {
       ctx.beginPath();
@@ -123,13 +131,17 @@
     var pebble = !!(opts && opts.pebble);
 
     var rand = GLUtil.mulberry32((seed | 0) * 3571 + diameter);
+    // Pebbles get a padded canvas (elongated outlines stick out past the nominal
+    // circle). c.drawScale tells the caller how much bigger than `diameter` it is.
+    var size = pebble ? Math.round(diameter * 1.3) : diameter;
     var c = document.createElement('canvas');
-    c.width = c.height = diameter;
+    c.width = c.height = size;
+    c.drawScale = size / diameter;
     var ctx = c.getContext('2d');
-    var r = diameter / 2;
+    var r = size / 2;                              // half the canvas
 
     // Separate stream so the texture crop is identical whether or not the shape is a pebble
-    var trace = pebble ? pebblePath(r, GLUtil.mulberry32((seed | 0) * 911 + diameter + 7)) : circlePath(r);
+    var trace = pebble ? pebblePath(diameter / 2, r, GLUtil.mulberry32((seed | 0) * 911 + diameter + 7)) : circlePath(r);
 
     ctx.save();
     trace(ctx);
@@ -149,11 +161,11 @@
       ctx.fillStyle = shadeShift < 0
         ? 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')'
         : 'rgba(255,255,255,' + Math.min(0.6, shadeShift).toFixed(3) + ')';
-      ctx.fillRect(0, 0, diameter, diameter);
+      ctx.fillRect(0, 0, size, size);
       ctx.restore();
     }
 
-    drawShading(ctx, r, diameter, trace, pebble);
+    drawShading(ctx, r, size, trace, pebble);
     return c;
   }
 

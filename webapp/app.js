@@ -18,6 +18,8 @@
     }
   };
 
+  var SURFACE_LABELS = { COLOR: 'Color', WOOD: 'Wood', STONE: 'Stone' };
+
   var currentMode = localStorage.getItem('sortire_mode') === 'ORDER' ? MODES.ORDER : MODES.FIRST;
 
   function hsvToRgb(h, s, v) {
@@ -543,12 +545,13 @@
       ctx.shadowOffsetX = (SHADOW_OFF - L.x * r * 0.17) * dpr;
       ctx.shadowOffsetY = (-L.y * r * 0.17) * dpr;
       // Drawn far off-screen; only its shadow lands on-screen, shaped like the puck
-      ctx.drawImage(fg.puckCanvas, x - r - SHADOW_OFF, y - r, r * 2, r * 2);
+      var pr = r * (fg.puckCanvas.drawScale || 1);
+      ctx.drawImage(fg.puckCanvas, x - pr - SHADOW_OFF, y - pr, pr * 2, pr * 2);
       ctx.restore();
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.drawImage(fg.puckCanvas, x - r, y - r, r * 2, r * 2);
+      ctx.drawImage(fg.puckCanvas, x - pr, y - pr, pr * 2, pr * 2);
       ctx.restore();
     } else {
       ctx.save();
@@ -617,7 +620,7 @@
     var radius = baseRadius * winnerScale(grow);
     drawCircle(w, w.x, w.y, radius, w.color, 1);
 
-    if (Settings.bool('marker_enabled')) {
+    if (Settings.bool('marker_enabled') && SurfaceMode.getActiveMode() === SurfaceMode.MODES.COLOR) {
       var markerColor = getAdaptiveMarkerColor(w.color);
       var markerStroke = Settings.get('marker_stroke');
       var markerRadius = baseRadius * Settings.get('marker_radius');
@@ -831,6 +834,14 @@
     }
   }
 
+  // Surface = Color / Wood / Stone. Each keeps its own settings (see settings.js).
+  function selectSurface(surface) {
+    if (SurfaceMode.getActiveMode() === surface) return;
+    SurfaceMode.setActiveMode(surface);
+    reset();
+    buildTuningPanel();
+  }
+
   function selectMode(mode) {
     if (currentMode === mode) return;
     currentMode = mode;
@@ -840,6 +851,11 @@
   }
 
   var communityCodes = [];
+
+  function communityPool() {
+    var mode = Settings.getMode();
+    return communityCodes.filter(function (c) { return Settings.modeOfCode(c) === mode; });
+  }
 
   function fallbackCopy(text) {
     var ta = document.createElement('textarea');
@@ -890,18 +906,18 @@
           .map(function (l) { return l.trim(); })
           .filter(function (l) { return l && l.charAt(0) !== '#' && Settings.decode(l).ok; });
         var b = document.getElementById('code-shuffle');
-        if (b) b.style.display = communityCodes.length ? '' : 'none';
+        if (b) b.style.display = communityPool().length ? '' : 'none';
       })
       .catch(function () {});
   }
 
   function renderSavedList(wrap) {
     wrap.innerHTML = '';
-    var list = Settings.listSaved();
+    var list = Settings.listSaved(Settings.getMode());
     if (!list.length) {
       var empty = document.createElement('div');
       empty.className = 'saved-empty';
-      empty.textContent = 'Tunings you save will show up here.';
+      empty.textContent = 'Tunings you save for ' + SURFACE_LABELS[Settings.getMode()].toLowerCase() + ' will show up here.';
       wrap.appendChild(empty);
       return;
     }
@@ -953,7 +969,7 @@
   function buildCodesSection(content) {
     var title = document.createElement('div');
     title.className = 'panel-group-title';
-    title.textContent = 'Share & Saved Tunings';
+    title.textContent = SURFACE_LABELS[Settings.getMode()] + ' tuning: share & saved';
     content.appendChild(title);
 
     var box = document.createElement('div');
@@ -987,7 +1003,7 @@
     saveBtn.textContent = 'Save this tuning';
     saveBtn.addEventListener('click', function () {
       SoundManager.playClick();
-      var name = prompt('Name this tuning:', 'Tuning ' + (Settings.listSaved().length + 1));
+      var name = prompt('Name this tuning:', 'Tuning ' + (Settings.listSaved(Settings.getMode()).length + 1));
       if (name === null) return;
       var r = Settings.saveCode(name, Settings.currentCode());
       if (!r.ok) { alert(r.error); return; }
@@ -1000,11 +1016,11 @@
     shuffleBtn.className = 'panel-btn';
     shuffleBtn.textContent = 'Shuffle';
     shuffleBtn.title = 'Try a random tuning from the shared list';
-    shuffleBtn.style.display = communityCodes.length ? '' : 'none';
+    shuffleBtn.style.display = communityPool().length ? '' : 'none';
     shuffleBtn.addEventListener('click', function () {
       SoundManager.playClick();
       var cur = Settings.currentCode();
-      var pool = communityCodes.filter(function (c) { return c.toUpperCase() !== cur; });
+      var pool = communityPool().filter(function (c) { return c.toUpperCase() !== cur; });
       if (!pool.length) return;
       applyCodeAndRefresh(pool[Math.floor(Math.random() * pool.length)]);
     });
@@ -1024,6 +1040,28 @@
     if (!content) return;
 
     content.innerHTML = '';
+
+    var surface = SurfaceMode.getActiveMode();
+
+    var surfHeader = document.createElement('div');
+    surfHeader.className = 'panel-group-title';
+    surfHeader.textContent = 'Surface';
+    content.appendChild(surfHeader);
+
+    var surfBox = document.createElement('div');
+    surfBox.className = 'panel-group mode-box';
+    Settings.SURFACES.forEach(function (sf) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mode-pill-panel' + (surface === sf ? ' active' : '');
+      btn.textContent = SURFACE_LABELS[sf];
+      btn.addEventListener('click', function () {
+        SoundManager.playClick();
+        selectSurface(sf);
+      });
+      surfBox.appendChild(btn);
+    });
+    content.appendChild(surfBox);
 
     var modeHeader = document.createElement('div');
     modeHeader.className = 'panel-group-title';
@@ -1052,7 +1090,9 @@
     var groupOrder = ['WOOD', 'WINNER', 'AUDIO', 'COLORS', 'APPEARANCE', 'TIMING', 'SYSTEM'];
 
     groupOrder.forEach(function (groupKey) {
-      var groupItems = Settings.SCHEMA.filter(function (s) { return s.group === groupKey; });
+      var groupItems = Settings.SCHEMA.filter(function (s) {
+        return s.group === groupKey && !s.hidden && (!s.modes || s.modes.indexOf(surface) >= 0);
+      });
       if (groupItems.length === 0 && groupKey !== 'SYSTEM') return;
 
       var header = document.createElement('div');
@@ -1116,18 +1156,6 @@
           toggle.appendChild(cb);
           toggle.appendChild(slider);
           cb.addEventListener('change', function () {
-            if (s.key === 'woodgrain_enabled') {
-              SurfaceMode.setActiveMode(cb.checked ? SurfaceMode.MODES.WOOD : SurfaceMode.MODES.COLOR);
-              buildTuningPanel();
-              reset();
-              return;
-            }
-            if (s.key === 'rockgrain_enabled') {
-              SurfaceMode.setActiveMode(cb.checked ? SurfaceMode.MODES.STONE : SurfaceMode.MODES.COLOR);
-              buildTuningPanel();
-              reset();
-              return;
-            }
             Settings.set(s.key, cb.checked ? 1 : 0);
             if (s.resetsRound) reset(); else requestDraw();
           });

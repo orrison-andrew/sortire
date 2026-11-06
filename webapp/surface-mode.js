@@ -6,7 +6,7 @@
  * Exposes SurfaceMode:
  *   - MODES: { WOOD, STONE, COLOR }
  *   - getActiveMode() -> 'WOOD' | 'STONE' | 'COLOR'
- *   - setActiveMode(mode) -> sets the flags (mutually exclusive) and applies the mode preset
+ *   - setActiveMode(mode) -> Settings.setMode: flags (mutually exclusive) + that surface's own settings
  */
 (function (root) {
   'use strict';
@@ -21,11 +21,10 @@
     return MODES.COLOR;
   }
 
+  // Switching surface also swaps in that surface's own saved settings
   function setActiveMode(mode) {
     if (typeof Settings === 'undefined') return;
-    Settings.set('woodgrain_enabled', mode === MODES.WOOD ? 1 : 0);
-    Settings.set('rockgrain_enabled', mode === MODES.STONE ? 1 : 0);
-    Settings.applyPreset(mode === MODES.WOOD ? 'woodgrain' : mode === MODES.STONE ? 'stone' : 'colors');
+    Settings.setMode(mode);
   }
 
   root.SurfaceMode = { MODES: MODES, getActiveMode: getActiveMode, setActiveMode: setActiveMode };

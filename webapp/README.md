@@ -61,10 +61,10 @@ You can skip installing and just keep using the link in your browser.
 No touchscreen? On a computer, click to place a finger. Hold **Shift** while clicking to place several at once.
 
 ### Settings
-Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The **Use woodgrain surface** and **Use stone surface** switches are mutually exclusive; with both off you get plain flat colored circles. The woodgrain switch gives the wooden-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood spread time**, **Flood edge softness**, **Flood edge ripple** and **Flood edge follows new grain** shape how it spreads, and **Winner grows** only controls the winning disc. Other sections cover the countdown length, sounds and vibration. **Reset** puts everything back to the defaults.
+Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The first setting is **Surface**: **Color** (flat colored circles), **Wood** or **Stone**. Each surface keeps its own settings (materials, lighting, winner effects, colors, finger look), so changing one never disturbs the others; sound, timing and instruction text are shared. Rows that don't apply to a surface are hidden (for example the winner marker ring is Color only). Wood and stone give the textured-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood spread time**, **Flood edge softness**, **Flood edge ripple** and **Flood edge follows new grain** shape how it spreads, and **Winner grows** only controls the winning disc. Other sections cover the countdown length, sounds and vibration. **Reset** puts everything back to the defaults.
 
 ### Share and save your tunings
-Every setting is captured in one **settings code**, a short string of letters and numbers shown at the top of the settings panel (under **Share & Saved Tunings**).
+Each surface's tuning is captured in one **settings code**, a short string of letters and numbers shown at the top of the settings panel (under **Share & Saved Tunings**).
 
 - **Copy code** copies it so you can send it to someone. They tap **Import**, paste it, and get exactly your tuning.
 - **Save this tuning** keeps it in your own list with a name you choose. Tap a saved tuning to apply it, ✎ to rename it, ✕ to delete it. Saved tunings stay on your device.
@@ -103,7 +103,7 @@ When a new version is ready, a pill that says **"New version available"** appear
 - A PWA must be served over **HTTPS**. Any static host works: GitHub Pages, Netlify, Cloudflare Pages, or your own server. Upload the contents of this folder so that `index.html` is at the root of your URL.
 - **GitHub Pages:** in the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**. The workflow in `.github/workflows/deploy-pwa.yml` deploys the `webapp` folder on every push to `main`.
 - Replace `https://YOUR-APP-URL-HERE/` at the top of this file with your real address.
-- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v18`). This is how installed copies know to update.
+- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v19`). This is how installed copies know to update.
 - The app makes no network requests of its own beyond loading its own files: no analytics, no tracking, no accounts. The service worker only caches the app's own files.
 
 ### Settings codes (for developers)
