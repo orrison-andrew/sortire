@@ -8,6 +8,7 @@
  *     labels:   { maple: 'Maple', ... }
  *     colors:   function (key) -> { light:[r,g,b], dark:[r,g,b] }
  *     generate: function (key, size, seed) -> <canvas> | null   (GPU generator)
+ *     discShape: 'round' (default) | 'pebble'   outline of the finger discs
  *   })
  *
  * Returned API:
@@ -69,7 +70,7 @@
       diameter = Math.max(32, diameter | 0);
       shade = shade || 0;
       var id = k + '_' + diameter + '_' + (seed | 0) + '_' + shade.toFixed(2);
-      return discCache.get(id) || discCache.set(id, Disc.render(atlas(k), diameter, seed, shade));
+      return discCache.get(id) || discCache.set(id, Disc.render(atlas(k), diameter, seed, shade, { pebble: def.discShape === 'pebble' }));
     }
 
     var api = {

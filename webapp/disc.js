@@ -1,51 +1,126 @@
 /**
- * disc.js: Renders a shaded round puck from any material texture (wood or stone).
+ * disc.js: Renders a shaded puck from any material texture (wood or stone).
  *
- *   Disc.render(atlas, diameter, seed, shadeShift) -> <canvas>
+ *   Disc.render(atlas, diameter, seed, shadeShift, opts) -> <canvas>
+ *       opts.pebble: true -> irregular, seeded pebble outline instead of a circle
  *
  * The face is a random rotated crop (55% window) of the material atlas. Edge
- * darkening, rim and bevel are baked in. The glossy highlight is NOT: app.js
- * draws the drop shadow live so it can follow the device tilt.
+ * darkening, rim and bevel are baked in. The area outside the outline is fully
+ * transparent, so app.js can cast the drop shadow from the canvas itself and it
+ * follows whatever shape the puck has. The glossy highlight is NOT baked in.
  */
 (function (root) {
   'use strict';
 
   var TAU = Math.PI * 2;
 
-  function drawShading(ctx, r, diameter) {
+  // Seeded pebble outline: a slightly squashed, rotated ellipse with a few low
+  // harmonic lumps. Same seed -> same pebble. Fits inside radius r.
+  function pebblePath(r, rand) {
+    var N = 72;
+    var squash = 0.72 + rand() * 0.24;          // minor / major axis
+    var rot = rand() * TAU;
+    var harmonics = [];
+    for (var k = 2; k <= 5; k++) {
+      harmonics.push({ k: k, amp: (0.09 / (k - 1)) * (0.3 + rand() * 0.7), ph: rand() * TAU });
+    }
+    var pts = [], maxD = 0, i;
+    for (i = 0; i < N; i++) {
+      var th = i / N * TAU;
+      var rad = 1;
+      for (var h = 0; h < harmonics.length; h++) rad += harmonics[h].amp * Math.cos(harmonics[h].k * th + harmonics[h].ph);
+      var x = Math.cos(th) * rad, y = Math.sin(th) * rad * squash;
+      var px = x * Math.cos(rot) - y * Math.sin(rot);
+      var py = x * Math.sin(rot) + y * Math.cos(rot);
+      pts.push([px, py]);
+      maxD = Math.max(maxD, Math.hypot(px, py));
+    }
+    var s = (r * 0.96 - 1) / maxD;               // keep the rim stroke inside the canvas
+    pts = pts.map(function (p) { return [r + p[0] * s, r + p[1] * s]; });
+
+    return function trace(ctx) {
+      ctx.beginPath();
+      var last = pts[N - 1], first = pts[0];
+      ctx.moveTo((last[0] + first[0]) / 2, (last[1] + first[1]) / 2);
+      for (var j = 0; j < N; j++) {
+        var p = pts[j], q = pts[(j + 1) % N];
+        ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2);
+      }
+      ctx.closePath();
+    };
+  }
+
+  function circlePath(r) {
+    return function trace(ctx) {
+      ctx.beginPath();
+      ctx.arc(r, r, r, 0, TAU);
+      ctx.closePath();
+    };
+  }
+
+  function drawShading(ctx, r, diameter, trace, pebble) {
+    // Edge darkening
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
+    trace(ctx);
     ctx.clip();
-    var edgeGrad = ctx.createRadialGradient(r, r, r * 0.55, r, r, r);
-    edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    edgeGrad.addColorStop(1, 'rgba(0,0,0,0.38)');
-    ctx.fillStyle = edgeGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
+    if (pebble) {
+      // Follows the outline: stacked strokes fade in toward the rim
+      ctx.lineJoin = 'round';
+      [0.36, 0.26, 0.16, 0.08].forEach(function (w) {
+        ctx.lineWidth = r * w;
+        ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+        trace(ctx);
+        ctx.stroke();
+      });
+    } else {
+      var edgeGrad = ctx.createRadialGradient(r, r, r * 0.55, r, r, r);
+      edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      edgeGrad.addColorStop(1, 'rgba(0,0,0,0.38)');
+      ctx.fillStyle = edgeGrad;
+      ctx.fillRect(0, 0, diameter, diameter);
+    }
     ctx.restore();
 
+    // Dark rim
+    ctx.lineJoin = 'round';
     ctx.lineWidth = r * 0.05;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
+    if (pebble) {
+      trace(ctx);
+    } else {
+      ctx.beginPath();
+      ctx.arc(r, r, r - ctx.lineWidth / 2, 0, TAU);
+    }
     ctx.stroke();
 
-    ctx.lineWidth = r * 0.03;
+    // Light inner bevel
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.scale(0.93, 0.93);
+    ctx.translate(-r, -r);
+    ctx.lineWidth = r * 0.03 / 0.93;
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.beginPath();
-    ctx.arc(r, r, r * 0.93, 0, TAU);
+    if (pebble) {
+      trace(ctx);
+    } else {
+      ctx.beginPath();
+      ctx.arc(r, r, r, 0, TAU);
+    }
     ctx.stroke();
+    ctx.restore();
   }
 
   /**
    * @param {HTMLCanvasElement} atlas  material texture to crop from
    * @param {number} diameter          physical px
-   * @param {number} seed              per-disc: crop origin and rotation only
+   * @param {number} seed              per-disc: crop origin, rotation and pebble shape
    * @param {number} [shadeShift]      -0.25..+0.25 darkens/lightens the face
+   * @param {{pebble:boolean}} [opts]
    */
-  function render(atlas, diameter, seed, shadeShift) {
+  function render(atlas, diameter, seed, shadeShift, opts) {
     diameter = Math.max(32, diameter | 0);
     shadeShift = shadeShift || 0;
+    var pebble = !!(opts && opts.pebble);
 
     var rand = GLUtil.mulberry32((seed | 0) * 3571 + diameter);
     var c = document.createElement('canvas');
@@ -53,9 +128,11 @@
     var ctx = c.getContext('2d');
     var r = diameter / 2;
 
+    // Separate stream so the texture crop is identical whether or not the shape is a pebble
+    var trace = pebble ? pebblePath(r, GLUtil.mulberry32((seed | 0) * 911 + diameter + 7)) : circlePath(r);
+
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(r, r, r, 0, TAU);
+    trace(ctx);
     ctx.clip();
     ctx.translate(r, r);
     ctx.rotate(rand() * TAU);
@@ -67,8 +144,7 @@
 
     if (shadeShift !== 0) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(r, r, r, 0, TAU);
+      trace(ctx);
       ctx.clip();
       ctx.fillStyle = shadeShift < 0
         ? 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')'
@@ -77,7 +153,7 @@
       ctx.restore();
     }
 
-    drawShading(ctx, r, diameter);
+    drawShading(ctx, r, diameter, trace, pebble);
     return c;
   }
 

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var SETTINGS_VERSION = '8';
+  var SETTINGS_VERSION = '9';
 
   // Dropdown labels come from the material modules so they can never drift out of order.
   function labelsFrom(mod) {
@@ -69,7 +69,7 @@
     { key: 'hint_size', group: 'APPEARANCE', label: 'Instruction text size', def: 18, min: 10, max: 40, step: 1, unit: 'px' },
     { key: 'hint_opacity', group: 'APPEARANCE', label: 'Instruction opacity', def: 0.4, min: 0.1, max: 1.0, step: 0.05 },
 
-    { key: 'min_fingers', group: 'TIMING', label: 'Minimum fingers to start', def: 2, min: 2, max: 10, step: 1 },
+    { key: 'min_fingers', group: 'TIMING', label: 'Minimum fingers to start', def: 1, min: 1, max: 10, step: 1 },
     { key: 'countdown_ms', group: 'TIMING', label: 'Countdown time', def: 2000, min: 500, max: 5000, step: 100, unit: 'ms' },
     { key: 'reveal_gap_ms', group: 'TIMING', label: 'Order reveal gap', def: 600, min: 100, max: 2000, step: 50, unit: 'ms' },
     { key: 'order_pop_ms', group: 'TIMING', label: 'Order reveal pop time', def: 400, min: 50, max: 1000, step: 50, unit: 'ms' },
@@ -154,7 +154,7 @@
     ['hint_enabled', 0, 1, 1],
     ['hint_size', 10, 40, 1],
     ['hint_opacity', 0.1, 1.0, 0.05],
-    ['min_fingers', 2, 10, 1],
+    ['min_fingers', 1, 10, 1],
     ['countdown_ms', 500, 5000, 100],
     ['reveal_gap_ms', 100, 2000, 50],
     ['order_pop_ms', 50, 1000, 50],

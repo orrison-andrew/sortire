@@ -173,7 +173,8 @@
     keys: ROCK_TYPES,
     labels: labels,
     colors: function (k) { return { light: TYPES[k].colorA, dark: TYPES[k].colorB }; },
-    generate: generate
+    generate: generate,
+    discShape: 'pebble'
   });
 
   set.TYPES = TYPES;

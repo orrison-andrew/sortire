@@ -542,10 +542,8 @@
       ctx.shadowBlur = r * 0.40 * dpr;
       ctx.shadowOffsetX = (SHADOW_OFF - L.x * r * 0.17) * dpr;
       ctx.shadowOffsetY = (-L.y * r * 0.17) * dpr;
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.arc(x - SHADOW_OFF, y, r, 0, Math.PI * 2);
-      ctx.fill();
+      // Drawn far off-screen; only its shadow lands on-screen, shaped like the puck
+      ctx.drawImage(fg.puckCanvas, x - r - SHADOW_OFF, y - r, r * 2, r * 2);
       ctx.restore();
 
       ctx.save();
