@@ -19,14 +19,12 @@
     SYSTEM: { title: 'System & Feedback' }
   };
 
-  // Schema defaults are the PLAIN look: flat colours, no pulse, no marker, no winner
-  // effects. PRESETS.colors below is built from these.
   var SETTINGS_SCHEMA = [
     // Woodgrain & Stone
     { key: 'woodgrain_enabled', group: 'WOOD', label: 'Enable woodgrain style', def: 0, isBool: true, resetsRound: true },
     { key: 'wood_type', group: 'WOOD', label: 'Wood species', def: 3, min: 0, max: 11, step: 1, options: ['Maple', 'White Oak', 'Red Oak', 'Walnut', 'Ebony', 'Purpleheart', 'Cherry', 'Pine', 'Mahogany', 'Padauk', 'Zebrawood', 'Yellowheart'], resetsRound: true },
     { key: 'rockgrain_enabled', group: 'WOOD', label: 'Enable stone style', def: 0, isBool: true, resetsRound: true },
-    { key: 'rock_type', group: 'WOOD', label: 'Stone material', def: 0, min: 0, max: 4, step: 1, options: ['Granite', 'Marble', 'Slate', 'Sandstone', 'Obsidian'], resetsRound: true },
+    { key: 'rock_type', group: 'WOOD', label: 'Stone material', def: 0, min: 0, max: 4, step: 1, options: ['River Pebble', 'Polished Amber', 'Speckled Granite', 'Blue Slate', 'Dark Basalt'], resetsRound: true },
     { key: 'wood_vignette', group: 'WOOD', label: 'Table vignette', def: 0.28, min: 0, max: 0.6, step: 0.02 },
     { key: 'wood_sheen', group: 'WOOD', label: 'Varnish sheen', def: 0.5, min: 0, max: 1, step: 0.05 },
     { key: 'wood_sheen_anim', group: 'WOOD', label: 'Animate sheen and edge ripple', def: 1, isBool: true },
@@ -109,6 +107,7 @@
     colors: presetFrom({}),
     woodgrain: presetFrom({
       woodgrain_enabled: 1,
+      rockgrain_enabled: 0,
       wood_sheen_anim: 0,
       disc_gloss: 0.35,
       wood_flood_ripple: 0.2,
@@ -117,6 +116,7 @@
       fx_particles: 0
     }),
     stone: presetFrom({
+      woodgrain_enabled: 0,
       rockgrain_enabled: 1,
       wood_sheen_anim: 0,
       disc_gloss: 0.35,
@@ -127,7 +127,7 @@
     })
   };
 
-  var SETTINGS_VERSION = '5';
+  var SETTINGS_VERSION = '6';
 
   var values = {};
   var listeners = [];

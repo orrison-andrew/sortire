@@ -178,6 +178,7 @@
   }
 
   var woodBg = null;
+  var rockBg = null;
   var fx = null;
   var floodTable = null;
   var floodGrain = null;
@@ -409,7 +410,7 @@
     }
 
     var discWood = pickDiscWood();
-    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'granite';
+    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'riverPebble';
     var shadeShift = (Math.random() * 0.5 - 0.25);
     var seed = Math.floor(Math.random() * 100000);
     var color = palette.color(nextColorIndex++);
@@ -540,8 +541,8 @@
       var SHADOW_OFF = 10000;
       var L = lightVec();
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,' + (0.45 * alpha) + ')';
-      ctx.shadowBlur = r * 0.35 * dpr;
+      ctx.shadowColor = 'rgba(0,0,0,' + (0.50 * alpha) + ')';
+      ctx.shadowBlur = r * 0.40 * dpr;
       ctx.shadowOffsetX = (SHADOW_OFF - L.x * r * 0.17) * dpr;
       ctx.shadowOffsetY = (-L.y * r * 0.17) * dpr;
       ctx.fillStyle = '#000';
@@ -556,7 +557,7 @@
       ctx.restore();
 
       var gloss = Settings.get('disc_gloss');
-      if (gloss > 0) {
+      if (gloss > 0 && woodgrainOn) {
         var ga = gloss * alpha;
         ctx.save();
         ctx.beginPath();
@@ -798,10 +799,12 @@
       });
     } else if (rockgrainOn && typeof RockGrainGL !== 'undefined') {
       if (bgEl && bgEl.style.display !== 'block') bgEl.style.display = 'block';
-      if (woodBg) woodBg.draw({
-        species: getBaseRockTypeKey(), seed: 1, table: null, flood: null,
+      if (!rockBg && bgEl) rockBg = RockGrainGL.createBackground(bgEl);
+      var tiltOn = Settings.bool('wood_tilt');
+      if (rockBg) rockBg.draw({
+        species: getBaseRockTypeKey(), seed: bgSeed,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
-        tiltX: Settings.bool('wood_tilt') ? tilt.x : 0, tiltY: Settings.bool('wood_tilt') ? tilt.y : 0,
+        tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
         sheen: Settings.get('wood_sheen'), vignette: Settings.get('wood_vignette')
       });
     } else {
@@ -1219,6 +1222,7 @@
   function init() {
     var woodEl = document.getElementById('wood-bg');
     if (woodEl && typeof WoodGrain !== 'undefined') { woodBg = WoodGrain.createBackground(woodEl); woodBg.onRestore = requestDraw; }
+    if (woodEl && typeof RockGrainGL !== 'undefined') { rockBg = RockGrainGL.createBackground(woodEl); }
     var fxEl = document.getElementById('fx');
     if (fxEl && typeof WoodGrain !== 'undefined') { fx = WoodGrain.createEffects(fxEl); fx.onRestore = requestDraw; }
 
