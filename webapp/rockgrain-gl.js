@@ -1,209 +1,89 @@
-/*
- * rockgrain-gl.js: GPU River Pebble & Natural Slate Stone texture generator.
- *
- * Provides WebGL-accelerated rendering for natural river stones, pebbles,
- * and realistic split-face slate table surfaces with winner flood expansion.
- *
- * Exposes RockGrainGL:
- *   - TYPES / ROCK_TYPES
- *   - generate(typeName, size, seed, colorVar) -> <canvas>
- *   - getDiscCanvas(diameter, typeName, seed, shadeShift, colorVar) -> <canvas>
- *   - createBackground(container) -> live table layer matching WoodGrain API
+/**
+ * rockgrain-gl.js: Procedural 2D GLSL shaders for generating varying rock/stone textures.
  */
-(function (root) {
+(function () {
   'use strict';
 
-  var TYPES = {
-    slatePebble: {
-      label: 'Natural Slate',
-      colorA: [65, 72, 78],
-      colorB: [35, 38, 42],
-      colorC: [105, 115, 122],
-      scale: 2.2,
-      roughness: 0.025,
-      speckle: 0.15,
-      foliation: 0.45
-    },
-    riverPebble: {
-      label: 'River Pebble',
-      colorA: [155, 168, 175],
-      colorB: [90, 102, 112],
-      colorC: [215, 220, 225],
-      scale: 3.2,
-      roughness: 0.04,
-      speckle: 0.4,
-      foliation: 0.0
-    },
-    amberPebble: {
-      label: 'Warm Terracotta',
-      colorA: [215, 135, 75],
-      colorB: [155, 80, 40],
-      colorC: [245, 185, 120],
-      scale: 2.8,
-      roughness: 0.03,
-      speckle: 0.3,
-      foliation: 0.0
-    },
-    granitePebble: {
-      label: 'Speckled Granite',
-      colorA: [210, 205, 200],
-      colorB: [55, 52, 50],
-      colorC: [170, 125, 115],
-      scale: 4.0,
-      roughness: 0.06,
-      speckle: 0.85,
-      foliation: 0.0
-    },
-    basaltPebble: {
-      label: 'Dark Basalt',
-      colorA: [50, 53, 56],
-      colorB: [22, 24, 27],
-      colorC: [95, 100, 105],
-      scale: 3.2,
-      roughness: 0.05,
-      speckle: 0.45,
-      foliation: 0.2
-    },
-    chalkPebble: {
-      label: 'Chalk White',
-      colorA: [230, 230, 225],
-      colorB: [180, 180, 175],
-      colorC: [250, 250, 248],
-      scale: 2.5,
-      roughness: 0.02,
-      speckle: 0.2,
-      foliation: 0.0
-    },
-    mossPebble: {
-      label: 'Green River Stone',
-      colorA: [105, 125, 105],
-      colorB: [60, 75, 60],
-      colorC: [160, 180, 155],
-      scale: 3.5,
-      roughness: 0.04,
-      speckle: 0.5,
-      foliation: 0.0
-    }
-  };
+  var canvas = document.createElement('canvas');
+  var gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, alpha: false, antialias: true }) || 
+           canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true, alpha: false });
 
-  var ROCK_TYPES = ['slatePebble', 'riverPebble', 'amberPebble', 'granitePebble', 'basaltPebble', 'chalkPebble', 'mossPebble'];
-  var DISC_SIZE = 1024;
-  var BG_SIZE   = 2048;
-
-  function mulberry32(seed) {
-    var a = (seed >>> 0) || 1;
-    return function () {
-      a = (a + 0x6D2B79F5) | 0;
-      var t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
+  if (!gl) {
+    console.warn('WebGL not supported, falling back to basic rendering for stone');
+    window.RockGrainGL = null;
+    return;
   }
 
-  function warn(msg, e) {
-    if (typeof console !== 'undefined') console.warn('RockGrainGL: ' + msg, (e && e.message) || e || '');
-  }
+  var VERTS = [
+    'attribute vec2 aPos;',
+    'void main() { gl_Position = vec4(aPos, 0.0, 1.0); }'
+  ].join('\n');
 
-  var VERT = 'attribute vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }';
-  var QUAD = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-
-  function getGL(canvas, attrs) {
-    var gl = null;
-    try { gl = canvas.getContext('webgl', attrs) || canvas.getContext('experimental-webgl', attrs); } catch (e) {}
-    return gl;
-  }
-
-  function hasHighp(gl) {
-    var f = gl.getShaderPrecisionFormat && gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
-    return !!(f && f.precision >= 23);
-  }
-
-  function compile(gl, type, src) {
-    var sh = gl.createShader(type);
-    gl.shaderSource(sh, src);
-    gl.compileShader(sh);
-    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-      var log = gl.getShaderInfoLog(sh);
-      gl.deleteShader(sh);
-      throw new Error('shader compile failed: ' + log);
-    }
-    return sh;
-  }
-
-  function buildProgram(gl, vsSrc, fsSrc, uniforms, attribs) {
-    var prog = gl.createProgram();
-    gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, vsSrc));
-    gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, fsSrc));
-    (attribs || []).forEach(function (n, i) { gl.bindAttribLocation(prog, i, n); });
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      throw new Error('program link failed: ' + gl.getProgramInfoLog(prog));
-    }
-    var loc = {};
-    uniforms.forEach(function (n) { loc[n] = gl.getUniformLocation(prog, n); });
-    return { prog: prog, loc: loc };
-  }
-
-  function rgb01(arr) { return [arr[0] / 255, arr[1] / 255, arr[2] / 255]; }
-
-  // Smoother, cleaner slate fragment shader
-  var GEN_FRAG = [
-    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+  var UTILS = [
     'precision highp float;',
-    '#else',
-    'precision mediump float;',
-    '#endif',
-    '',
-    'uniform float uSize;',
-    'uniform vec3  uColorA, uColorB, uColorC;',
-    'uniform float uScale, uRoughness, uSpeckle, uFoliation;',
-    'uniform vec2  uOffA, uOffB;',
-    'uniform vec3  uColorShift;',
-    '',
-    'float hash(vec2 p) {',
-    '  vec3 p3 = fract(vec3(p.xyx) * 0.1031);',
-    '  p3 += dot(p3, p3.yzx + 33.33);',
-    '  return fract((p3.x + p3.y) * p3.z);',
+    'vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }',
+    'vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }',
+    'vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }',
+    'float snoise(vec2 v) {',
+    '  const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);',
+    '  vec2 i  = floor(v + dot(v, C.yy));',
+    '  vec2 x0 = v -   i + dot(i, C.xx);',
+    '  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);',
+    '  vec4 x12 = x0.xyxy + C.xxzz;',
+    '  x12.xy -= i1;',
+    '  i = mod289(i);',
+    '  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));',
+    '  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);',
+    '  m = m*m; m = m*m;',
+    '  vec3 x = 2.0 * fract(p * C.www) - 1.0;',
+    '  vec3 h = abs(x) - 0.5;',
+    '  vec3 ox = floor(x + 0.5);',
+    '  vec3 a0 = x - ox;',
+    '  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);',
+    '  vec3 g; g.x  = a0.x  * x0.x  + h.x  * x0.y;',
+    '  g.yz = a0.yz * x12.xz + h.yz * x12.yw;',
+    '  return 130.0 * dot(m, g);',
     '}',
-    '',
-    'float vnoise(vec2 p, vec2 off) {',
-    '  p += off;',
-    '  vec2 i = floor(p);',
-    '  vec2 f = p - i;',
-    '  float a = hash(i);',
-    '  float b = hash(i + vec2(1.0, 0.0));',
-    '  float c = hash(i + vec2(0.0, 1.0));',
-    '  float d = hash(i + vec2(1.0, 1.0));',
-    '  vec2 u = f * f * (3.0 - 2.0 * f);',
-    '  return a + (b - a) * u.x + (c - a) * u.y + (a - b - c + d) * u.x * u.y;',
-    '}',
-    '',
     'float fbm(vec2 p, vec2 off) {',
-    '  float s = 0.0, amp = 0.5;',
-    '  for (int i = 0; i < 3; i++) {',
-    '    s += amp * vnoise(p, off);',
-    '    p *= 1.8;',
-    '    amp *= 0.5;',
-    '  }',
-    '  return s;',
+    '  p += off;',
+    '  float f = 0.0, amp = 0.5;',
+    '  for(int i=0; i<4; i++) { f += amp * snoise(p); p *= 2.0; amp *= 0.5; }',
+    '  return f * 0.5 + 0.5;',
     '}',
-    '',
+    'float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }'
+  ].join('\n');
+
+  var GEN_FRAG = [
+    UTILS,
+    'uniform vec3 uColorA;',
+    'uniform vec3 uColorB;',
+    'uniform vec3 uColorC;',
+    'uniform float uScale;',
+    'uniform float uRoughness;',
+    'uniform float uSpeckle;',
+    'uniform float uFoliation;',
+    'uniform vec2 uOffA;',
+    'uniform vec2 uOffB;',
+    'uniform vec2 uSize;',
+    'uniform float uColorShift;',
     'void main() {',
     '  vec2 uv = gl_FragCoord.xy / uSize;',
     '  vec2 p = uv * uScale;',
     '  ',
     '  float slateGrain = 0.0;',
     '  if (uFoliation > 0.01) {',
-    '    vec2 sp = vec2(p.x * 0.5, p.y * 14.0);',
+    '    vec2 sp = vec2(p.x * 0.5, p.y * (14.0 + uFoliation * 10.0));',
     '    float f1 = fbm(sp, uOffA);',
-    '    slateGrain = (f1 - 0.5) * uFoliation;',
+    '    slateGrain = (f1 - 0.5) * uFoliation * 1.5;',
     '  }',
     '  ',
     '  float n1 = fbm(p * 1.8 + vec2(0.0, slateGrain * 0.2), uOffA);',
-    '  float n2 = fbm(p * 3.5, uOffB);',
+    '  float n2 = fbm(p * 3.5 + vec2(slateGrain * 0.1, 0.0), uOffB);',
     '  ',
     '  vec3 col = mix(uColorA, uColorB, smoothstep(0.2, 0.8, n1 + slateGrain * 0.3));',
-    '  col = mix(col, uColorC, (n2 + slateGrain * 0.15) * 0.25);',
+    '  ',
+    '  float specks = smoothstep(0.6, 0.9, n2);',
+    '  col = mix(col, uColorC, clamp((specks + n2 * 0.3) * uSpeckle, 0.0, 1.0));',
     '  ',
     '  float micro = (hash(gl_FragCoord.xy) - 0.5) * uRoughness;',
     '  col = clamp(col + vec3(micro), 0.0, 1.0);',
@@ -213,438 +93,300 @@
     '}'
   ].join('\n');
 
-  var GEN_UNIFORMS = ['uSize', 'uColorA', 'uColorB', 'uColorC', 'uScale', 'uRoughness', 'uSpeckle', 'uFoliation', 'uOffA', 'uOffB', 'uColorShift'];
-
-  var gen = null;
-  var genFailed = false;
-
-  function initGen() {
-    if (gen && gen.gl && !gen.gl.isContextLost()) return gen;
-    gen = null;
-    genFailed = false;
-    try {
-      var canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 16;
-      var gl = getGL(canvas, { antialias: false, alpha: false, preserveDrawingBuffer: true });
-      if (!gl) throw new Error('WebGL unavailable');
-      if (!hasHighp(gl)) throw new Error('GPU lacks high precision float');
-      var P = buildProgram(gl, VERT, GEN_FRAG, GEN_UNIFORMS, ['aPos']);
-      gl.useProgram(P.prog);
-      var buf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0);
-      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      gen = { gl: gl, canvas: canvas, P: P };
-      return gen;
-    } catch (e) {
-      genFailed = true;
-      warn('GPU generator unavailable', e);
-      return null;
-    }
-  }
-
-  function generateGL(typeName, size, seed, colorShift) {
-    var g = initGen();
-    if (!g) return null;
-    var gl = g.gl, loc = g.P.loc;
-    try {
-      var t = TYPES[typeName] || TYPES.slatePebble;
-      var cA = rgb01(t.colorA), cB = rgb01(t.colorB), cC = rgb01(t.colorC);
-      colorShift = colorShift || [1.0, 1.0, 1.0];
-
-      g.canvas.width = g.canvas.height = size;
-      gl.viewport(0, 0, size, size);
-      gl.useProgram(g.P.prog);
-
-      gl.uniform1f(loc.uSize, size);
-      gl.uniform3f(loc.uColorA, cA[0], cA[1], cA[2]);
-      gl.uniform3f(loc.uColorB, cB[0], cB[1], cB[2]);
-      gl.uniform3f(loc.uColorC, cC[0], cC[1], cC[2]);
-      gl.uniform1f(loc.uScale, t.scale);
-      gl.uniform1f(loc.uRoughness, t.roughness);
-      gl.uniform1f(loc.uSpeckle, t.speckle);
-      gl.uniform1f(loc.uFoliation, t.foliation || 0);
-      gl.uniform2f(loc.uOffA, (seed * 17) % 100 + 1.3, (seed * 31) % 100 + 2.4);
-      gl.uniform2f(loc.uOffB, (seed * 43) % 100 + 3.7, (seed * 71) % 100 + 4.1);
-      gl.uniform3f(loc.uColorShift, colorShift[0], colorShift[1], colorShift[2]);
-
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-      var out = document.createElement('canvas');
-      out.width = out.height = size;
-      out.getContext('2d').drawImage(g.canvas, 0, 0);
-      return out;
-    } catch (e) {
-      warn('texture gen failed', e);
-      return null;
-    }
-  }
-
-  function flatTexture(typeName, size) {
-    var t = TYPES[typeName] || TYPES.slatePebble;
-    var c = document.createElement('canvas');
-    c.width = c.height = Math.min(size, 256);
-    var ctx = c.getContext('2d');
-    var gr = ctx.createLinearGradient(0, 0, 0, c.height);
-    gr.addColorStop(0, 'rgb(' + t.colorA.join(',') + ')');
-    gr.addColorStop(1, 'rgb(' + t.colorB.join(',') + ')');
-    ctx.fillStyle = gr;
-    ctx.fillRect(0, 0, c.width, c.height);
-    return c;
-  }
-
-  function generate(name, size, seed, colorShift) {
-    name = TYPES[name] ? name : 'slatePebble';
-    size = size || 1024;
-    seed = seed || 1;
-    return generateGL(name, size, seed, colorShift) || flatTexture(name, size);
-  }
-
-  var discTexCache = {};
-  function getDiscTexture(typeName, seed) {
-    var rand = mulberry32(seed * 777 + typeName.length);
-    var rVar = 0.82 + rand() * 0.36;
-    var gVar = 0.82 + rand() * 0.36;
-    var bVar = 0.82 + rand() * 0.36;
-    var key = typeName + '_' + seed;
-    if (!discTexCache[key]) {
-      discTexCache[key] = generate(typeName, DISC_SIZE, seed, [rVar, gVar, bVar]);
-    }
-    return discTexCache[key];
-  }
-
-  var bgTexCache = {};
-  function getMasterTexture(typeName, seed) {
-    typeName = TYPES[typeName] ? typeName : 'slatePebble';
-    seed = (seed || 42) | 0;
-    var key = typeName + '_' + seed;
-    if (!bgTexCache[key]) {
-      bgTexCache[key] = generate(typeName, BG_SIZE, seed, [1.0, 1.0, 1.0]);
-    }
-    return bgTexCache[key];
-  }
-
-  function drawPebbleShading(ctx, r, diameter) {
-    var edgeGrad = ctx.createRadialGradient(r, r, r * 0.5, r, r, r);
-    edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    edgeGrad.addColorStop(1, 'rgba(0,0,0,0.40)');
-    ctx.fillStyle = edgeGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
-
-    var hx = r * 0.70, hy = r * 0.70;
-    var specGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 0.60);
-    specGrad.addColorStop(0, 'rgba(255,255,255,0.40)');
-    specGrad.addColorStop(0.5, 'rgba(255,255,255,0.10)');
-    specGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = specGrad;
-    ctx.fillRect(0, 0, diameter, diameter);
-
-    ctx.lineWidth = r * 0.04;
-    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-    ctx.stroke();
-  }
-
-  var discCache = {};
-
-  function getDiscCanvas(diameter, typeName, seed, shadeShift) {
-    diameter   = Math.max(32, diameter | 0);
-    typeName   = TYPES[typeName] ? typeName : 'slatePebble';
-    seed       = (seed || 1) | 0;
-    shadeShift = shadeShift || 0;
-
-    var cacheKey = typeName + '_' + diameter + '_' + seed + '_' + shadeShift.toFixed(2);
-    if (discCache[cacheKey]) return discCache[cacheKey];
-
-    var tex  = getDiscTexture(typeName, seed);
-    var rand = mulberry32(seed * 3571 + diameter);
-    var TAU  = Math.PI * 2;
-
-    var c   = document.createElement('canvas');
-    c.width = c.height = diameter;
-    var ctx = c.getContext('2d');
-    var r   = diameter / 2;
-
-    ctx.save();
-    ctx.beginPath();
-    var points = 24;
-    for (var i = 0; i < points; i++) {
-      var angle = (i / points) * TAU;
-      var deform = Math.sin(angle * 2 + seed) * 0.07 + Math.cos(angle * 3 + seed * 1.7) * 0.04;
-      var pr = r * (0.91 + deform);
-      var px = r + Math.cos(angle) * pr;
-      var py = r + Math.sin(angle) * pr;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.clip();
-
-    ctx.translate(r, r);
-    ctx.rotate(rand() * TAU);
-    var sw = tex.width * 0.55;
-    var ox = rand() * (tex.width - sw);
-    var oy = rand() * (tex.height - sw);
-    ctx.drawImage(tex, ox, oy, sw, sw, -r, -r, 2 * r, 2 * r);
-    ctx.restore();
-
-    ctx.save();
-    ctx.beginPath();
-    for (var j = 0; j < points; j++) {
-      var a = (j / points) * TAU;
-      var d = Math.sin(a * 2 + seed) * 0.07 + Math.cos(a * 3 + seed * 1.7) * 0.04;
-      var rad = r * (0.91 + d);
-      var x = r + Math.cos(a) * rad;
-      var y = r + Math.sin(a) * rad;
-      if (j === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.clip();
-
-    if (shadeShift !== 0) {
-      ctx.fillStyle = shadeShift < 0
-        ? 'rgba(0,0,0,' + Math.min(0.6, -shadeShift).toFixed(3) + ')'
-        : 'rgba(255,255,255,' + Math.min(0.6, shadeShift).toFixed(3) + ')';
-      ctx.fillRect(0, 0, diameter, diameter);
-    }
-
-    drawPebbleShading(ctx, r, diameter);
-    ctx.restore();
-
-    discCache[cacheKey] = c;
-    return c;
-  }
-
-  // Improved stone recoloration shader with rich tone mapping
   var BG_FRAG = [
-    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
-    'precision highp float;',
-    '#else',
-    'precision mediump float;',
-    '#endif',
-    'uniform sampler2D uTex, uTex2;',
-    'uniform vec2 uRes, uOrigin, uDraw, uFloodC, uTilt;',
-    'uniform vec3 uSrcL, uSrcD, uFlL, uFlD;',
-    'uniform float uFloodOn, uFloodTex, uFloodR, uFloodF, uRipple, uTime, uSheen, uVig;',
-    '',
-    'vec3 recolor(vec3 c, vec3 tL, vec3 tD) {',
-    '  float lum = dot(c, vec3(0.299, 0.587, 0.114));',
-    '  vec3 target = mix(tD, tL, smoothstep(0.1, 0.85, lum));',
-    '  return mix(c, target * (0.7 + 0.6 * lum), 0.82);',
-    '}',
-    '',
+    UTILS,
+    'uniform sampler2D uTex;',
+    'uniform vec2 uSize;',
+    'uniform float uTime;',
+    'uniform vec2 uTilt;',
+    'uniform float uSheen;',
+    'uniform float uVignette;',
+    'uniform vec2 uFloodCenter;',
+    'uniform float uFloodR;',
+    'uniform float uFloodFeather;',
+    'uniform float uFloodRipple;',
+    'uniform float uFloodGrainEdge;',
+    'uniform vec3 uBaseColorA;',
+    'uniform vec3 uBaseColorB;',
     'void main() {',
-    '  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
-    '  vec2 tc = (p - uOrigin) / uDraw;',
-    '  vec3 tex = texture2D(uTex, tc).rgb;',
-    '  vec3 col = tex;',
-    '',
-    '  if (uFloodOn > 0.5) {',
-    '    vec2 dv = p - uFloodC;',
-    '    float dist = length(dv);',
-    '    float ang = atan(dv.y, dv.x + 0.0001);',
-    '    float f = max(uFloodF, 2.0);',
-    '    vec3 fl = (uFloodTex > 0.5) ? texture2D(uTex2, tc).rgb : recolor(tex, uFlL, uFlD);',
-    '    float edge = uFloodR + uRipple * 0.25 * f * sin(ang * 9.0 + uTime * 3.5);',
-    '    float mask = 1.0 - smoothstep(edge - f, edge, dist);',
-    '    col = mix(col, fl, mask);',
-    '    float q = (dist - (edge - f * 0.5)) / max(f * 0.6, 1.0);',
-    '    col += exp(-q * q) * uRipple * 0.12;',
+    '  vec2 uv = gl_FragCoord.xy / uSize;',
+    '  vec3 col = texture2D(uTex, uv).rgb;',
+    '  ',
+    '  if (uFloodR > 0.0) {',
+    '    float d = distance(gl_FragCoord.xy, uFloodCenter);',
+    '    float edge = uFloodR - d;',
+    '    ',
+    '    if (edge < 0.0) discard;',
+    '    ',
+    '    float alpha = 1.0;',
+    '    if (uFloodFeather > 0.0 && edge < uFloodFeather) {',
+    '      alpha = smoothstep(0.0, uFloodFeather, edge);',
+    '    }',
+    '    ',
+    '    if (uFloodGrainEdge > 0.0 && edge < uFloodFeather) {',
+    '      float g = fbm(uv * 10.0, vec2(0.0));',
+    '      float baseLum = dot(col, vec3(0.299, 0.587, 0.114));',
+    '      alpha = mix(alpha, smoothstep(0.0, 1.0, alpha + (g - 0.5) * uFloodGrainEdge + (baseLum - 0.5) * uFloodGrainEdge), alpha);',
+    '    }',
+    '    ',
+    '    if (uFloodRipple > 0.0 && edge > 0.0 && edge < uFloodFeather * 2.0) {',
+    '      float r = sin(edge * 0.15 - uTime * 5.0) * uFloodRipple * smoothstep(0.0, uFloodFeather, uFloodFeather - abs(edge - uFloodFeather));',
+    '      col += vec3(r);',
+    '    }',
+    '    ',
+    '    if (alpha <= 0.0) discard;',
+    '    if (alpha < 1.0) {',
+    '      gl_FragColor = vec4(col, alpha);',
+    '      return;',
+    '    }',
     '  }',
-    '',
-    '  float lum = dot(col, vec3(0.299, 0.587, 0.114));',
-    '  vec2 q2 = p / uRes;',
-    '  vec2 c = vec2(0.5 + uTilt.x * 0.35 + 0.08 * sin(uTime * 0.6), 0.38 + uTilt.y * 0.25 + 0.05 * cos(uTime * 0.4));',
-    '  vec2 dq = (q2 - c) * vec2(1.0, uRes.y / uRes.x);',
-    '  float g = exp(-dot(dq, dq) / 0.10);',
-    '  col += g * uSheen * 0.25 * (0.6 + 0.8 * lum) * vec3(1.0, 0.98, 0.92);',
-    '',
-    '  vec2 pc = p - uRes * 0.5;',
-    '  float r0 = min(uRes.x, uRes.y) * 0.3;',
-    '  float r1 = max(uRes.x, uRes.y) * 0.75;',
-    '  float vv = clamp((length(pc) - r0) / (r1 - r0), 0.0, 1.0);',
-    '  col *= 1.0 - uVig * vv;',
-    '',
-    '  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);',
+    '  ',
+    '  if (uSheen > 0.0) {',
+    '    vec3 lightVec = normalize(vec3(-0.55 + uTilt.x * 0.8, -0.65 + uTilt.y * 0.8, 1.2));',
+    '    vec3 normal = normalize(vec3((uv.x - 0.5)*0.2, (uv.y - 0.5)*0.2, 1.0));',
+    '    float spec = pow(max(dot(reflect(-lightVec, normal), vec3(0.0,0.0,1.0)), 0.0), 30.0);',
+    '    col += vec3(spec * uSheen);',
+    '  }',
+    '  ',
+    '  if (uVignette > 0.0) {',
+    '    float dist = distance(uv, vec2(0.5));',
+    '    float v = smoothstep(0.3, 1.0, dist);',
+    '    col = mix(col, col * 0.3, v * uVignette);',
+    '  }',
+    '  ',
+    '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
 
-  var BG_UNIFORMS = [
-    'uTex', 'uTex2', 'uRes', 'uOrigin', 'uDraw', 'uSrcL', 'uSrcD',
-    'uFlL', 'uFlD', 'uFloodC', 'uFloodOn', 'uFloodTex', 'uFloodR', 'uFloodF', 'uRipple',
-    'uTilt', 'uTime', 'uSheen', 'uVig'
-  ];
-
-  function createBackground(container) {
-    var cv = document.createElement('canvas');
-    cv.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;';
-    container.innerHTML = '';
-    container.appendChild(cv);
-
-    var L = { onRestore: null, available: true };
-    var gl = null, P = null, buf = null, tex = null, texKey = '', tw = 1, th = 1;
-    var tex2 = null, tex2Key = '', tw2 = 1, th2 = 1;
-    var failed = false, lost = false;
-
-    function build() {
-      gl = getGL(cv, { alpha: false, antialias: false });
-      if (!gl) throw new Error('WebGL unavailable');
-      if (!hasHighp(gl)) throw new Error('GPU lacks high precision float');
-      P = buildProgram(gl, VERT, BG_FRAG, BG_UNIFORMS, ['aPos']);
-      buf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
-      tex = null;
-      texKey = '';
-      tex2 = null;
-      tex2Key = '';
+  function compileShader(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      return null;
     }
+    return s;
+  }
 
-    try {
-      build();
-    } catch (e) {
-      failed = true;
-      L.available = false;
-      warn('table layer unavailable', e);
+  function createProgram(vs, fs) {
+    var p = gl.createProgram();
+    gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    return p;
+  }
+
+  var genProg = createProgram(VERTS, GEN_FRAG);
+  var bgProg = createProgram(VERTS, BG_FRAG);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+  var TYPES = {
+    blueSlate: {
+      label: 'Blue Slate',
+      colorA: [65, 72, 78], colorB: [35, 38, 42], colorC: [105, 115, 122],
+      scale: 2.2, roughness: 0.025, speckle: 0.3, foliation: 0.45
+    },
+    riverPebble: {
+      label: 'River Pebble',
+      colorA: [155, 168, 175], colorB: [90, 102, 112], colorC: [215, 220, 225],
+      scale: 3.2, roughness: 0.04, speckle: 0.4, foliation: 0.0
+    },
+    warmTerracotta: {
+      label: 'Warm Terracotta',
+      colorA: [215, 135, 75], colorB: [155, 80, 40], colorC: [245, 185, 120],
+      scale: 2.8, roughness: 0.03, speckle: 0.2, foliation: 0.05
+    },
+    speckledGranite: {
+      label: 'Speckled Granite',
+      colorA: [210, 205, 200], colorB: [55, 52, 50], colorC: [40, 35, 35],
+      scale: 4.5, roughness: 0.06, speckle: 1.2, foliation: 0.0
+    },
+    darkBasalt: {
+      label: 'Dark Basalt',
+      colorA: [50, 53, 56], colorB: [22, 24, 27], colorC: [95, 100, 105],
+      scale: 3.2, roughness: 0.05, speckle: 0.4, foliation: 0.2
+    },
+    obsidianGlass: {
+      label: 'Obsidian Glass',
+      colorA: [25, 22, 30], colorB: [10, 8, 12], colorC: [60, 55, 75],
+      scale: 1.5, roughness: 0.005, speckle: 0.1, foliation: 0.3
+    },
+    roseQuartz: {
+      label: 'Rose Quartz',
+      colorA: [245, 210, 220], colorB: [220, 175, 190], colorC: [255, 250, 255],
+      scale: 2.5, roughness: 0.02, speckle: 0.5, foliation: 0.0
+    },
+    lapisLazuli: {
+      label: 'Lapis Lazuli',
+      colorA: [30, 60, 140], colorB: [15, 30, 80], colorC: [210, 180, 70],
+      scale: 3.0, roughness: 0.03, speckle: 0.8, foliation: 0.1
+    },
+    jadeite: {
+      label: 'Jadeite',
+      colorA: [100, 180, 130], colorB: [50, 120, 70], colorC: [160, 220, 180],
+      scale: 2.8, roughness: 0.015, speckle: 0.4, foliation: 0.15
+    },
+    tigersEye: {
+      label: 'Tiger\'s Eye',
+      colorA: [180, 110, 20], colorB: [80, 40, 5], colorC: [240, 180, 60],
+      scale: 2.0, roughness: 0.01, speckle: 0.5, foliation: 0.95
+    },
+    desertSandstone: {
+      label: 'Desert Sandstone',
+      colorA: [210, 120, 80], colorB: [160, 70, 40], colorC: [240, 180, 130],
+      scale: 2.2, roughness: 0.05, speckle: 0.3, foliation: 0.75
+    },
+    amethyst: {
+      label: 'Amethyst',
+      colorA: [130, 80, 180], colorB: [70, 30, 100], colorC: [210, 170, 240],
+      scale: 3.5, roughness: 0.07, speckle: 0.6, foliation: 0.1
     }
-
-    cv.addEventListener('webglcontextlost', function (e) { e.preventDefault(); lost = true; }, false);
-    cv.addEventListener('webglcontextrestored', function () {
-      try { build(); lost = false; if (L.onRestore) L.onRestore(); }
-      catch (e) { failed = true; L.available = false; }
-    }, false);
-
-    function makeTexture(src) {
-      gl.activeTexture(gl.TEXTURE0);
-      var t = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
-      var w = src.width, h = src.height;
-      var pot = (w & (w - 1)) === 0 && (h & (h - 1)) === 0;
-      if (pot) gl.generateMipmap(gl.TEXTURE_2D);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, pot ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      return { t: t, w: w, h: h };
-    }
-
-    L.draw = function (s) {
-      if (failed || lost || !gl || gl.isContextLost()) return false;
-      try {
-        var dpr = window.devicePixelRatio || 1;
-        var w = container.offsetWidth || window.innerWidth;
-        var h = container.offsetHeight || window.innerHeight;
-        var pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
-        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
-        gl.viewport(0, 0, pw, ph);
-
-        var species = TYPES[s.species] ? s.species : 'slatePebble';
-        var seed = (s.seed || 42) | 0;
-        var key = species + '_' + seed;
-
-        gl.useProgram(P.prog);
-        if (key !== texKey || !tex) {
-          if (tex2 && key === tex2Key) {
-            var t0 = tex, w0 = tw, h0 = th, k0 = texKey;
-            tex = tex2; tw = tw2; th = th2; texKey = tex2Key;
-            tex2 = t0; tw2 = w0; th2 = h0; tex2Key = k0;
-          } else {
-            if (tex) gl.deleteTexture(tex);
-            var m = makeTexture(getMasterTexture(species, seed));
-            tex = m.t; tw = m.w; th = m.h; texKey = key;
-          }
-        }
-
-        var fl = s.flood;
-        var own = !!(fl && fl.species && TYPES[fl.species] && fl.seed !== undefined);
-        if (own) {
-          var fkey = fl.species + '_' + (fl.seed | 0);
-          if (fkey !== tex2Key || !tex2) {
-            if (tex2) gl.deleteTexture(tex2);
-            var m2 = makeTexture(getMasterTexture(fl.species, fl.seed));
-            tex2 = m2.t; tw2 = m2.w; th2 = m2.h; tex2Key = fkey;
-          }
-        }
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.uniform1i(P.loc.uTex, 0);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, (own && tex2) ? tex2 : tex);
-        gl.uniform1i(P.loc.uTex2, 1);
-        gl.activeTexture(gl.TEXTURE0);
-
-        var scale = Math.max(pw / tw, ph / th);
-        var dw = tw * scale, dh = th * scale;
-        gl.uniform2f(P.loc.uRes, pw, ph);
-        gl.uniform2f(P.loc.uOrigin, (pw - dw) / 2, (ph - dh) / 2);
-        gl.uniform2f(P.loc.uDraw, dw, dh);
-
-        var src = TYPES[species], c;
-        c = rgb01(src.colorA); gl.uniform3f(P.loc.uSrcL, c[0], c[1], c[2]);
-        c = rgb01(src.colorB); gl.uniform3f(P.loc.uSrcD, c[0], c[1], c[2]);
-
-        var ft = fl && TYPES[fl.species];
-        gl.uniform1f(P.loc.uFloodOn, ft ? 1.0 : 0.0);
-        gl.uniform1f(P.loc.uFloodTex, own ? 1.0 : 0.0);
-        c = rgb01((ft || src).colorA); gl.uniform3f(P.loc.uFlL, c[0], c[1], c[2]);
-        c = rgb01((ft || src).colorB); gl.uniform3f(P.loc.uFlD, c[0], c[1], c[2]);
-        gl.uniform2f(P.loc.uFloodC, ft ? fl.x * dpr : 0, ft ? fl.y * dpr : 0);
-        gl.uniform1f(P.loc.uFloodR, ft ? fl.r * dpr : 0);
-        gl.uniform1f(P.loc.uFloodF, ft ? Math.max(1, (fl.feather || 0) * dpr) : 1);
-        gl.uniform1f(P.loc.uRipple, ft ? (fl.ripple || 0) : 0);
-
-        gl.uniform2f(P.loc.uTilt, s.tiltX || 0, s.tiltY || 0);
-        gl.uniform1f(P.loc.uTime, s.time || 0);
-        gl.uniform1f(P.loc.uSheen, s.sheen || 0.4);
-        gl.uniform1f(P.loc.uVig, s.vignette || 0.28);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        return true;
-      } catch (e) {
-        failed = true;
-        L.available = false;
-        warn('rock table draw failed', e);
-        return false;
-      }
-    };
-    return L;
-  }
-
-  function getTypeKey(index) {
-    index = Math.max(0, Math.min(ROCK_TYPES.length - 1, index | 0));
-    return ROCK_TYPES[index];
-  }
-
-  function getBaseColor(name) {
-    var t = TYPES[name] || TYPES.slatePebble;
-    return {
-      r: Math.round((t.colorA[0] + t.colorB[0]) / 2),
-      g: Math.round((t.colorA[1] + t.colorB[1]) / 2),
-      b: Math.round((t.colorA[2] + t.colorB[2]) / 2)
-    };
-  }
-
-  function getRandomType() {
-    return ROCK_TYPES[Math.floor(Math.random() * ROCK_TYPES.length)];
-  }
-
-  root.RockGrainGL = {
-    TYPES: TYPES,
-    ROCK_TYPES: ROCK_TYPES,
-    mulberry32: mulberry32,
-    generate: generate,
-    getDiscCanvas: getDiscCanvas,
-    createBackground: createBackground,
-    getTypeKey: getTypeKey,
-    getBaseColor: getBaseColor,
-    getRandomType: getRandomType
   };
 
-})(typeof window !== 'undefined' ? window : this);
+  var ROCK_TYPES = [
+    'blueSlate', 'riverPebble', 'warmTerracotta', 'speckledGranite', 'darkBasalt',
+    'obsidianGlass', 'roseQuartz', 'lapisLazuli', 'jadeite', 'tigersEye',
+    'desertSandstone', 'amethyst'
+  ];
+
+  function seedRandom(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function setVec3(prog, name, arr) {
+    gl.uniform3f(gl.getUniformLocation(prog, name), arr[0]/255, arr[1]/255, arr[2]/255);
+  }
+
+  function flatTexture(w, h, rgb) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var x = c.getContext('2d');
+    x.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+    x.fillRect(0, 0, w, h);
+    return c;
+  }
+
+  function generateGL(w, h, rockType, seed, shift) {
+    var src = TYPES[rockType] || TYPES.blueSlate;
+    canvas.width = w; canvas.height = h;
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(genProg);
+
+    var rng = seedRandom(seed);
+    var oAx = rng() * 1000, oAy = rng() * 1000;
+    var oBx = rng() * 1000, oBy = rng() * 1000;
+
+    gl.uniform2f(gl.getUniformLocation(genProg, 'uSize'), w, h);
+    setVec3(genProg, 'uColorA', src.colorA);
+    setVec3(genProg, 'uColorB', src.colorB);
+    setVec3(genProg, 'uColorC', src.colorC);
+    gl.uniform1f(gl.getUniformLocation(genProg, 'uScale'), src.scale);
+    gl.uniform1f(gl.getUniformLocation(genProg, 'uRoughness'), src.roughness);
+    gl.uniform1f(gl.getUniformLocation(genProg, 'uSpeckle'), src.speckle);
+    gl.uniform1f(gl.getUniformLocation(genProg, 'uFoliation'), src.foliation);
+    gl.uniform2f(gl.getUniformLocation(genProg, 'uOffA'), oAx, oAy);
+    gl.uniform2f(gl.getUniformLocation(genProg, 'uOffB'), oBx, oBy);
+    gl.uniform1f(gl.getUniformLocation(genProg, 'uColorShift'), 1.0 + (shift || 0));
+
+    var aPos = gl.getAttribLocation(genProg, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    return canvas;
+  }
+
+  function createBackground(w, h, rockType, seed) {
+    var src = TYPES[rockType] || TYPES.blueSlate;
+    var shift = (seed % 100) / 100 * 0.1 - 0.05;
+    
+    var baseCanvas = generateGL(w, h, rockType, seed, shift);
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, baseCanvas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    return { tex: tex, type: src };
+  }
+
+  var bgTexCache = {};
+
+  function getCachedBackground(w, h, rockType, seed) {
+    var key = w + 'x' + h + '_' + rockType + '_' + seed;
+    if (bgTexCache[key]) return bgTexCache[key];
+    bgTexCache[key] = createBackground(w, h, rockType, seed);
+    return bgTexCache[key];
+  }
+
+  function drawFlood(opts) {
+    var w = opts.width, h = opts.height;
+    canvas.width = w; canvas.height = h;
+    gl.viewport(0, 0, w, h);
+
+    var bgObj = getCachedBackground(w, h, opts.rockType, opts.seed);
+
+    gl.useProgram(bgProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, bgObj.tex);
+    gl.uniform1i(gl.getUniformLocation(bgProg, 'uTex'), 0);
+
+    gl.uniform2f(gl.getUniformLocation(bgProg, 'uSize'), w, h);
+    gl.uniform1f(gl.getUniformLocation(bgProg, 'uTime'), opts.time || 0);
+    gl.uniform2f(gl.getUniformLocation(bgProg, 'uTilt'), opts.tiltX || 0, opts.tiltY || 0);
+    gl.uniform1f(gl.getUniformLocation(bgProg, 'uSheen'), opts.sheen || 0.15);
+    gl.uniform1f(gl.getUniformLocation(bgProg, 'uVignette'), opts.vignette || 0.7);
+
+    setVec3(bgProg, 'uBaseColorA', bgObj.type.colorA);
+    setVec3(bgProg, 'uBaseColorB', bgObj.type.colorB);
+
+    if (opts.flood) {
+      var dpr = window.devicePixelRatio || 1;
+      gl.uniform2f(gl.getUniformLocation(bgProg, 'uFloodCenter'), opts.flood.x * dpr, h - opts.flood.y * dpr);
+      gl.uniform1f(gl.getUniformLocation(bgProg, 'uFloodR'), opts.flood.r * dpr);
+      gl.uniform1f(gl.getUniformLocation(bgProg, 'uFloodFeather'), opts.flood.feather * dpr);
+      gl.uniform1f(gl.getUniformLocation(bgProg, 'uFloodRipple'), opts.flood.ripple || 0);
+      gl.uniform1f(gl.getUniformLocation(bgProg, 'uFloodGrainEdge'), opts.flood.grain || 0);
+    } else {
+      gl.uniform1f(gl.getUniformLocation(bgProg, 'uFloodR'), 0.0);
+    }
+
+    var aPos = gl.getAttribLocation(bgProg, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    return canvas;
+  }
+
+  function getDiscCanvas(d, rockType, seed, shift) {
+    var c = generateGL(d, d, rockType, seed, shift);
+    var out = document.createElement('canvas');
+    out.width = d; out.height = d;
+    var ctx = out.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(d/2, d/2, d/2, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(c, 0, 0);
+    return out;
+  }
+
+  window.RockGrainGL = {
+    ROCK_TYPES: ROCK_TYPES,
+    TYPES: TYPES,
+    getTypeKey: function(idx) { return ROCK_TYPES[idx % ROCK_TYPES.length]; },
+    drawFlood: drawFlood,
+    getDiscCanvas: getDiscCanvas
+  };
+})();

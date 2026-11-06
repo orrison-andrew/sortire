@@ -698,17 +698,27 @@
     '  vec2 p = vec2(gl_FragCoord.x, uResPx.y - gl_FragCoord.y) / uDpr;',
     '  float d = length(p - uC);',
     '  float a = 0.0;',
-    '  if (uShock > 0.5 && uT < 0.9) {',
-    '    float R = 40.0 + 520.0 * (1.0 - exp(-uT * 3.2));',
-    '    float w = 14.0 + 26.0 * uT;',
-    '    float q = (d - R) / w;',
-    '    a += exp(-q * q) * (1.0 - uT / 0.9) * 0.6;',
+    '  if (uShock > 0.5 && uT < 1.2) {',
+    '    float fade = max(0.0, 1.0 - uT / 1.2);',
+    '    float R1 = 60.0 + 700.0 * (1.0 - exp(-uT * 4.0));',
+    '    float w1 = 3.0 + 5.0 * uT;',
+    '    float q1 = abs(d - R1) / w1;',
+    '    a += (0.8 / (1.0 + q1 * q1 * q1)) * fade;',
+    '    float uT2 = max(0.0, uT - 0.1);',
+    '    float R2 = 60.0 + 650.0 * (1.0 - exp(-uT2 * 3.5));',
+    '    float w2 = 8.0 + 12.0 * uT2;',
+    '    float q2 = abs(d - R2) / w2;',
+    '    a += (0.3 / (1.0 + q2 * q2)) * fade;',
+    '    if (R1 > 0.0) {',
+    '      a += exp(-d * d / (R1 * R1 * 0.5)) * 0.15 * fade;',
+    '    }',
     '  }',
     '  a = clamp(a, 0.0, 1.0);',
-    '  vec3 c = mix(uColor, vec3(1.0), 0.3);',
+    '  vec3 c = mix(uColor, vec3(1.0), 0.5);',
     '  gl_FragColor = vec4(c * a, a);',
     '}'
-  ].join('\n');
+  ].join('
+');
 
   var PART_VERT = [
     'attribute vec4 aP;',            // x angle, y speed, z size, w colour mix

@@ -88,6 +88,7 @@
 
   var lastWinnerColor   = null;
   var lastWinnerWood    = null;
+  var lastWinnerRock    = null;
   var lastWinnerSeed    = 0;
 
   var bgSeed = Math.floor(Math.random() * 100000) + 1;
@@ -185,9 +186,13 @@
     return (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null;
   }
 
+  function currentTableRock() {
+    return (Settings.bool('winner_bg_enabled') && lastWinnerRock) ? lastWinnerRock : null;
+  }
+
   function currentTableGrain() {
-    if (Settings.bool('winner_bg_enabled') && lastWinnerWood) {
-      return { species: lastWinnerWood, seed: lastWinnerSeed };
+    if (Settings.bool('winner_bg_enabled') && (lastWinnerWood || lastWinnerRock)) {
+      return { species: lastWinnerWood || getBaseWoodTypeKey(), rockType: lastWinnerRock || getBaseRockTypeKey(), seed: lastWinnerSeed };
     }
     return { species: getBaseWoodTypeKey(), rockType: getBaseRockTypeKey(), seed: bgSeed };
   }
@@ -299,6 +304,7 @@
 
     if (!Settings.bool('winner_bg_enabled')) {
       lastWinnerWood = null;
+      lastWinnerRock = null;
       lastWinnerSeed = 0;
       lastWinnerColor = null;
       bgSeed = Math.floor(Math.random() * 100000) + 1;
@@ -316,20 +322,21 @@
     if (currentMode === MODES.FIRST) {
       winnerId = ids[Math.floor(Math.random() * ids.length)];
       var growMs = winnerGrowMs();
-      var floodSpreadMs = Math.max(1800, Settings.get('flood_ms') * 2.2); // Graceful, slower flood spread
-      animationEnd = now + Math.max(growMs, floodSpreadMs, 1200);
+      var floodMs = Settings.get('flood_ms');
+      animationEnd = now + Math.max(growMs, floodMs, 1200);
 
       var w = fingers[winnerId];
       if (w) {
         floodBase = currentBackgroundColor();
         floodTable = currentTableGrain();
         floodGrain = {
-          species: Settings.bool('rockgrain_enabled') ? w.discRockType : w.discSpecies,
+          species: w.discSpecies,
           rockType: w.discRockType,
           seed: Math.floor(Math.random() * 100000) + 1
         };
         lastWinnerColor = w.color;
         lastWinnerWood  = floodGrain.species;
+        lastWinnerRock  = floodGrain.rockType;
         lastWinnerSeed  = floodGrain.seed;
         if (Settings.bool('winner_flood')) bgMix = 1;
         triggerWinnerFx(w);
@@ -390,6 +397,7 @@
 
   function pickDiscRock() {
     var types = RockGrainGL.ROCK_TYPES;
+    var tableRock = currentTableRock() || getBaseRockTypeKey();
     var used = {};
     types.forEach(function (k) { used[k] = 0; });
     fingerIds.forEach(function (id) {
@@ -398,7 +406,7 @@
     });
     var best = Infinity, pool = [];
     types.forEach(function (k) {
-      var score = used[k];
+      var score = used[k] + (k === tableRock ? 100 : 0);
       if (score < best) { best = score; pool = [k]; }
       else if (score === best) pool.push(k);
     });
@@ -748,7 +756,7 @@
       var e = (now - resultStart) / 1000;
       var growS = winnerGrowMs() / 1000;
       grow = easeOut((growS <= 0) ? 1 : Math.min(1, e / growS));
-      var spreadS = Math.max(1.8, Settings.get('flood_ms') * 2.2 / 1000); // Smoother, slower spread rate
+      var spreadS = Settings.get('flood_ms') / 1000;
       spread = easeOut(Math.min(1, e / spreadS));
       discR = Settings.get('radius') * winnerScale(grow);
       far = Math.max(
@@ -768,15 +776,20 @@
           x: winnerFg.x, y: winnerFg.y,
           r: discR + (far + feather * 1.5 - discR) * spread,
           feather: feather, ripple: Settings.get('wood_flood_ripple'), grain: grainEdge,
-          species: floodGrain.species || floodGrain.rockType, seed: floodGrain.seed
+          species: floodGrain.species, rockType: floodGrain.rockType, seed: floodGrain.seed
         };
       }
       var tiltOn = Settings.bool('wood_tilt');
+      
+      // Preserve the old background wood/rock grain underneath the active flood by referencing floodTable
+      var tGrain = (floodActive && floodTable) ? floodTable : currentTableGrain();
+      
       TableManager.draw({
-        woodType: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : getBaseWoodTypeKey(),
-        rockType: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : 'slatePebble',
-        table: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null,
-        seed: (Settings.bool('winner_bg_enabled') && lastWinnerSeed) ? lastWinnerSeed : bgSeed,
+        species: tGrain.species,
+        woodType: tGrain.species,
+        rockType: tGrain.rockType,
+        table: (Settings.bool('winner_bg_enabled') && (tGrain.species || tGrain.rockType)) ? (tGrain.species || tGrain.rockType) : null,
+        seed: tGrain.seed,
         flood: flood,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
         tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
