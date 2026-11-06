@@ -1,26 +1,31 @@
-const CACHE_NAME = 'sortire-pwa-v16';
+const CACHE_NAME = 'sortire-pwa-v17';
 
 const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './codes.css',
+  './gl-util.js',
+  './disc.js',
+  './table-layer.js',
+  './material-set.js',
   './woodgrain.js',
-  './rockgrain-gl.js',
+  './rocktexture.js',
+  './effects.js',
   './sound.js',
   './settings.js',
   './surface-mode.js',
   './table.js',
   './app.js',
-  './manifest.webmanifest',
+  './manifest.webmanifest'
+];
+
+const OPTIONAL_ASSETS = [
+  './codes.txt',
   './icons/icon-192.png',
   './icons/icon-round-192.png',
   './icons/icon-512.png',
   './icons/icon.svg'
-];
-
-const OPTIONAL_ASSETS = [
-  './codes.txt'
 ];
 
 self.addEventListener('install', (event) => {
@@ -72,7 +77,7 @@ self.addEventListener('fetch', (event) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse);
+            cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;

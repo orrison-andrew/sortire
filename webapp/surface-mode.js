@@ -1,19 +1,17 @@
 /**
  * surface-mode.js: Surface mode selector state & router for Sortire.
+ * The two settings woodgrain_enabled / rockgrain_enabled are the stored state;
+ * this module is the ONLY place that interprets them.
  *
  * Exposes SurfaceMode:
- *   - MODES: { WOOD: 'WOOD', STONE: 'STONE', COLOR: 'COLOR' }
- *   - getActiveMode() -> returns current active mode string ('WOOD' | 'STONE' | 'COLOR')
- *   - setActiveMode(mode) -> sets active mode, updates presets & marker ring settings
+ *   - MODES: { WOOD, STONE, COLOR }
+ *   - getActiveMode() -> 'WOOD' | 'STONE' | 'COLOR'
+ *   - setActiveMode(mode) -> sets the flags (mutually exclusive) and applies the mode preset
  */
 (function (root) {
   'use strict';
 
-  var MODES = {
-    WOOD: 'WOOD',
-    STONE: 'STONE',
-    COLOR: 'COLOR'
-  };
+  var MODES = { WOOD: 'WOOD', STONE: 'STONE', COLOR: 'COLOR' };
 
   function getActiveMode() {
     if (typeof Settings !== 'undefined') {
@@ -25,28 +23,10 @@
 
   function setActiveMode(mode) {
     if (typeof Settings === 'undefined') return;
-
-    if (mode === MODES.WOOD) {
-      Settings.set('woodgrain_enabled', 1);
-      Settings.set('rockgrain_enabled', 0);
-      Settings.applyPreset('woodgrain');
-    } else if (mode === MODES.STONE) {
-      Settings.set('woodgrain_enabled', 0);
-      Settings.set('rockgrain_enabled', 1);
-      Settings.applyPreset('stone');
-    } else {
-      Settings.set('woodgrain_enabled', 0);
-      Settings.set('rockgrain_enabled', 0);
-      Settings.applyPreset('colors');
-      if (!Settings.bool('marker_enabled')) Settings.set('marker_enabled', 1);
-      if (!Settings.bool('ring_enabled')) Settings.set('ring_enabled', 1);
-    }
+    Settings.set('woodgrain_enabled', mode === MODES.WOOD ? 1 : 0);
+    Settings.set('rockgrain_enabled', mode === MODES.STONE ? 1 : 0);
+    Settings.applyPreset(mode === MODES.WOOD ? 'woodgrain' : mode === MODES.STONE ? 'stone' : 'colors');
   }
 
-  root.SurfaceMode = {
-    MODES: MODES,
-    getActiveMode: getActiveMode,
-    setActiveMode: setActiveMode
-  };
-
+  root.SurfaceMode = { MODES: MODES, getActiveMode: getActiveMode, setActiveMode: setActiveMode };
 })(typeof window !== 'undefined' ? window : this);

@@ -61,7 +61,7 @@ You can skip installing and just keep using the link in your browser.
 No touchscreen? On a computer, click to place a finger. Hold **Shift** while clicking to place several at once.
 
 ### Settings
-Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The app starts with a plain look: flat colored circles. The **Woodgrain** switch changes to the wooden-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood spread time**, **Flood edge softness**, **Flood edge ripple** and **Flood edge follows new grain** shape how it spreads, and **Winner grows** only controls the winning disc. Other sections cover the countdown length, sounds and vibration. **Reset** puts everything back to the defaults.
+Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The **Use woodgrain surface** and **Use stone surface** switches are mutually exclusive; with both off you get plain flat colored circles. The woodgrain switch gives the wooden-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood spread time**, **Flood edge softness**, **Flood edge ripple** and **Flood edge follows new grain** shape how it spreads, and **Winner grows** only controls the winning disc. Other sections cover the countdown length, sounds and vibration. **Reset** puts everything back to the defaults.
 
 ### Share and save your tunings
 Every setting is captured in one **settings code**, a short string of letters and numbers shown at the top of the settings panel (under **Share & Saved Tunings**).
@@ -103,7 +103,7 @@ When a new version is ready, a pill that says **"New version available"** appear
 - A PWA must be served over **HTTPS**. Any static host works: GitHub Pages, Netlify, Cloudflare Pages, or your own server. Upload the contents of this folder so that `index.html` is at the root of your URL.
 - **GitHub Pages:** in the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**. The workflow in `.github/workflows/deploy-pwa.yml` deploys the `webapp` folder on every push to `main`.
 - Replace `https://YOUR-APP-URL-HERE/` at the top of this file with your real address.
-- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v14`). This is how installed copies know to update.
+- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v18`). This is how installed copies know to update.
 - The app makes no network requests of its own beyond loading its own files: no analytics, no tracking, no accounts. The service worker only caches the app's own files.
 
 ### Settings codes (for developers)
@@ -112,3 +112,23 @@ When a new version is ready, a pill that says **"New version available"** appear
 - **`CODE_FIELDS` is append-only.** Never reorder, edit or delete an entry. A new setting goes on the end, and its schema entry gets added in the same change. A warning in the browser console tells you if you forget.
 - `node tools/settings-codec.test.js` checks round-trips, old and newer codes and a "golden" code that must always decode the same way. Run it before releasing a change to `settings.js`.
 - `codes.txt` is an optional shared list: one code per line, nothing else. The **Shuffle** button picks from it. To add a tuning, paste its code on a new line.
+
+### Code layout (for developers)
+Scripts load in this order (see `index.html`); each one only uses the ones above it.
+
+| File | Responsibility |
+|---|---|
+| `gl-util.js` | Shared WebGL helpers, seeded PRNG, offscreen texture generator, LRU cache |
+| `disc.js` | Renders a shaded round puck from any material texture |
+| `table-layer.js` | The live GPU table surface and winner flood (one shader for every material) |
+| `material-set.js` | Builds the common API (keys, caches, discs, table layer) from a material definition |
+| `woodgrain.js` | Wood species data + wood texture shader |
+| `rocktexture.js` | Stone data + stone texture shader |
+| `effects.js` | Winner shockwave / particle layer |
+| `sound.js` | Procedural audio |
+| `settings.js` | Settings schema, codes, saved tunings, presets |
+| `surface-mode.js` | Single place that decides wood / stone / flat colour |
+| `table.js` | Picks the layer for the active surface mode |
+| `app.js` | Game logic, canvas rendering, settings panel |
+
+To add a new material type (for example metal), create a file like `rocktexture.js` that calls `MaterialSet.create(...)`, then add it to `SurfaceMode`, `TableManager` and `index.html`.

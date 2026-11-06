@@ -6,12 +6,21 @@
 
   var SETTINGS_VERSION = '8';
 
+  // Dropdown labels come from the material modules so they can never drift out of order.
+  function labelsFrom(mod) {
+    if (mod && mod.LABELS) return mod.LABELS;
+    var a = []; for (var i = 0; i < 12; i++) a.push(String(i + 1));
+    return a;
+  }
+  var WOOD_LABELS = labelsFrom(window.WoodGrain);
+  var ROCK_LABELS = labelsFrom(window.RockTexture);
+
   // Schema defines the UI groups, sliders, and encoding bounds for the shareable format.
   var SETTINGS_SCHEMA = [
     { key: 'woodgrain_enabled', group: 'WOOD', label: 'Use woodgrain surface', def: 1, isBool: true, resetsRound: true },
-    { key: 'rockgrain_enabled', group: 'WOOD', label: 'Use stone surface', def: 1, isBool: true, resetsRound: true },
-    { key: 'wood_type', group: 'WOOD', label: 'Wood material', def: 4, min: 0, max: 11, step: 1, options: ['Golden Oak', 'Rich Walnut', 'Dark Ebony', 'Cherry', 'Weathered Cedar', 'Maple', 'Purpleheart', 'Zebrawood', 'Mahogany', 'Ash', 'Teak', 'Bamboo'], resetsRound: true },
-    { key: 'rock_type', group: 'WOOD', label: 'Stone material', def: 0, min: 0, max: 11, step: 1, options: ['Blue Slate', 'River Pebble', 'Warm Terracotta', 'Speckled Granite', 'Dark Basalt', 'Obsidian Glass', 'Rose Quartz', 'Lapis Lazuli', 'Jadeite', 'Tiger\'s Eye', 'Desert Sandstone', 'Amethyst'], resetsRound: true },
+    { key: 'rockgrain_enabled', group: 'WOOD', label: 'Use stone surface', def: 0, isBool: true, resetsRound: true },
+    { key: 'wood_type', group: 'WOOD', label: 'Wood material', def: 4, min: 0, max: 11, step: 1, options: WOOD_LABELS, resetsRound: true },
+    { key: 'rock_type', group: 'WOOD', label: 'Stone material', def: 0, min: 0, max: 11, step: 1, options: ROCK_LABELS, resetsRound: true },
     { key: 'wood_tilt', group: 'WOOD', label: 'Tilt shifts lighting', def: 1, isBool: true },
     { key: 'wood_sheen_anim', group: 'WOOD', label: 'Animate sheen', def: 1, isBool: true },
     { key: 'wood_sheen', group: 'WOOD', label: 'Sheen intensity', def: 0.15, min: 0.0, max: 0.5, step: 0.01 },
@@ -31,7 +40,7 @@
     { key: 'fx_particles', group: 'WINNER', label: 'Particle count', def: 40, min: 0, max: 150, step: 5 },
 
     { key: 'sound_enabled', group: 'AUDIO', label: 'Sound effects', def: 1, isBool: true },
-    { key: 'sound_style', group: 'AUDIO', label: 'Pop sound', def: 0, min: 0, max: 3, step: 1, options: ['Wood block', 'Bubble', 'Tick', 'Snap'] },
+    { key: 'sound_style', group: 'AUDIO', label: 'Pop sound', def: 0, min: 0, max: 3, step: 1, options: ['Pop', 'Bubble', 'Blip', 'Laser'] },
     { key: 'haptic_tap', group: 'AUDIO', label: 'Haptic on tap', def: 1, isBool: true },
     { key: 'haptic_tick', group: 'AUDIO', label: 'Haptic on reveal', def: 1, isBool: true },
     { key: 'haptic_result', group: 'AUDIO', label: 'Haptic on final result', def: 1, isBool: true },
@@ -83,6 +92,19 @@
 
   var state = {};
   var listeners = [];
+
+  // Wood and stone surfaces are mutually exclusive (wood wins if both are set)
+  function normalizeSurface() {
+    if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
+  }
+
+  // Named bundles of settings applied when the surface mode changes.
+  // Empty bundles are deliberate: switching surface keeps the user's tuning.
+  var PRESETS = {
+    woodgrain: {},
+    stone: {},
+    colors: { marker_enabled: 1, ring_enabled: 1 }
+  };
 
   // Compression scheme mapping names to bounds. Max ranges must fit the exact values below.
   var CODE_FIELDS = [
@@ -152,6 +174,7 @@
         SETTINGS_SCHEMA.forEach(function (schema) {
           state[schema.key] = parsed[schema.key] !== undefined ? parsed[schema.key] : schema.def;
         });
+        normalizeSurface();
         return;
       } catch (e) {}
     }
@@ -256,9 +279,16 @@
     SETTINGS_SCHEMA.forEach(function (s) {
       if (st[s.key] !== undefined) state[s.key] = st[s.key];
     });
+    normalizeSurface();
     save();
     listeners.forEach(function (cb) { cb('all', null); });
     return { ok: true };
+  }
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) return;
+    for (var k in p) set(k, p[k]);
   }
 
   function dumpJson() { return JSON.stringify(state, null, 2); }
@@ -268,6 +298,7 @@
       SETTINGS_SCHEMA.forEach(function (s) {
         if (st[s.key] !== undefined) state[s.key] = st[s.key];
       });
+      normalizeSurface();
       save();
       listeners.forEach(function (cb) { cb('all', null); });
       return true;
@@ -311,7 +342,9 @@
     currentCode: encode,
     decode: decode,
     applyCode: applyCode,
+    dump: encode,
     dumpJson: dumpJson,
+    applyPreset: applyPreset,
     importJson: importJson,
     listSaved: listSaved,
     saveCode: saveCode,

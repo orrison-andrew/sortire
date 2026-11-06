@@ -145,22 +145,23 @@
 
     var baseRadius = Settings.get('radius');
     var discDiameter = Math.max(32, Math.round(baseRadius * 2 * dpr * 1.5));
-    if (Settings.bool('rockgrain_enabled') && typeof RockGrainGL !== 'undefined') {
-      this.puckCanvas = RockGrainGL.getDiscCanvas(discDiameter, discRockType, seed, shadeShift);
-    } else if (typeof WoodGrain !== 'undefined') {
-      this.puckCanvas = WoodGrain.getDiscCanvas(discDiameter, discSpecies, seed, shadeShift);
+    var mode = SurfaceMode.getActiveMode();
+    var set = surfaceSet(mode);
+    if (set) {
+      var key = (mode === SurfaceMode.MODES.STONE) ? discRockType : discSpecies;
+      this.puckCanvas = set.getDiscCanvas(discDiameter, key, seed, shadeShift);
     }
   }
 
-  function getBaseWoodTypeKey() {
-    var idx = Math.round(Settings.get('wood_type'));
-    return WoodGrain.getSpeciesKey ? WoodGrain.getSpeciesKey(idx) : WoodGrain.SPECIES_KEYS[idx] || 'walnut';
+  // The material set (WoodGrain / RockTexture) behind a surface mode, or null for flat colour
+  function surfaceSet(mode) {
+    if (mode === SurfaceMode.MODES.WOOD) return WoodGrain;
+    if (mode === SurfaceMode.MODES.STONE) return RockTexture;
+    return null;
   }
 
-  function getBaseRockTypeKey() {
-    var idx = Math.round(Settings.get('rock_type'));
-    return RockGrainGL.getTypeKey ? RockGrainGL.getTypeKey(idx) : RockGrainGL.ROCK_TYPES[idx] || 'slatePebble';
-  }
+  function getBaseWoodTypeKey() { return WoodGrain.getKey(Settings.get('wood_type')); }
+  function getBaseRockTypeKey() { return RockTexture.getKey(Settings.get('rock_type')); }
 
   function haptic(type) {
     if (!('vibrate' in navigator)) return;
@@ -243,12 +244,14 @@
     var n = Math.round(Settings.get('fx_particles'));
     if (!shock && n <= 0) return;
 
-    var sp = Settings.bool('woodgrain_enabled') ? WoodGrain.SPECIES[w.discSpecies] : null;
+    var mode = SurfaceMode.getActiveMode();
+    var set = surfaceSet(mode);
     var color = w.color, colA = w.color, colB = { r: 255, g: 255, b: 255 };
-    if (sp) {
-      color = { r: sp.light[0], g: sp.light[1], b: sp.light[2] };
+    if (set) {
+      var cols = set.getColors(mode === SurfaceMode.MODES.STONE ? w.discRockType : w.discSpecies);
+      color = { r: cols.light[0], g: cols.light[1], b: cols.light[2] };
       colA = color;
-      colB = { r: sp.dark[0], g: sp.dark[1], b: sp.dark[2] };
+      colB = { r: cols.dark[0], g: cols.dark[1], b: cols.dark[2] };
     }
     fx.trigger(w.x, w.y, {
       color: color, colA: colA, colB: colB,
@@ -377,36 +380,17 @@
     }
   }
 
-  function pickDiscWood() {
-    var keys = WoodGrain.SPECIES_KEYS;
-    var tableWood = currentTableWood() || getBaseWoodTypeKey();
+  // Least-used material first, never the table's own material (so discs stay visible)
+  function pickDiscKey(set, tableKey, field) {
     var used = {};
-    keys.forEach(function (k) { used[k] = 0; });
+    set.KEYS.forEach(function (k) { used[k] = 0; });
     fingerIds.forEach(function (id) {
       var f = fingers[id];
-      if (f && used[f.discSpecies] !== undefined) used[f.discSpecies]++;
+      if (f && used[f[field]] !== undefined) used[f[field]]++;
     });
     var best = Infinity, pool = [];
-    keys.forEach(function (k) {
-      var score = used[k] + (k === tableWood ? 100 : 0);
-      if (score < best) { best = score; pool = [k]; }
-      else if (score === best) pool.push(k);
-    });
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-
-  function pickDiscRock() {
-    var types = RockGrainGL.ROCK_TYPES;
-    var tableRock = currentTableRock() || getBaseRockTypeKey();
-    var used = {};
-    types.forEach(function (k) { used[k] = 0; });
-    fingerIds.forEach(function (id) {
-      var f = fingers[id];
-      if (f && used[f.discRockType] !== undefined) used[f.discRockType]++;
-    });
-    var best = Infinity, pool = [];
-    types.forEach(function (k) {
-      var score = used[k] + (k === tableRock ? 100 : 0);
+    set.KEYS.forEach(function (k) {
+      var score = used[k] + (k === tableKey ? 100 : 0);
       if (score < best) { best = score; pool = [k]; }
       else if (score === best) pool.push(k);
     });
@@ -425,8 +409,8 @@
       reset();
     }
 
-    var discWood = pickDiscWood();
-    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'slatePebble';
+    var discWood = pickDiscKey(WoodGrain, currentTableWood() || getBaseWoodTypeKey(), 'discSpecies');
+    var discRock = pickDiscKey(RockTexture, currentTableRock() || getBaseRockTypeKey(), 'discRockType');
     var shadeShift = (Math.random() * 0.5 - 0.25);
     var seed = Math.floor(Math.random() * 100000);
     var color = palette.color(nextColorIndex++);
@@ -508,7 +492,7 @@
   var pinnedMouseCount = 0;
 
   function onMouseDown(e) {
-    if (e.target.closest('#tune-btn') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal')) return;
+    if (e.target.closest('#tune-btn') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal') || e.target.closest('#update-toast')) return;
     var rect = canvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
@@ -550,10 +534,7 @@
   function drawCircle(fg, x, y, r, color, alpha) {
     if (r <= 0) return;
     alpha = (alpha === undefined) ? 1 : Math.max(0, Math.min(1, alpha));
-    var woodgrainOn = Settings.bool('woodgrain_enabled');
-    var rockgrainOn = Settings.bool('rockgrain_enabled');
-
-    if ((woodgrainOn || rockgrainOn) && fg && fg.puckCanvas) {
+    if (fg && fg.puckCanvas) {
       var SHADOW_OFF = 10000;
       var L = lightVec();
       ctx.save();
@@ -587,8 +568,6 @@
     var pulseAmount = Settings.get('pulse_amount');
     var pulseSpeed = Settings.get('pulse_speed');
     var baseRadius = Settings.get('radius');
-    var woodgrainOn = Settings.bool('woodgrain_enabled');
-    var rockgrainOn = Settings.bool('rockgrain_enabled');
     var showRing = (phase === 'COUNTING') && Settings.bool('ring_enabled');
     var ringOffset = Settings.get('ring_offset');
     var ringStroke = Settings.get('ring_stroke');
@@ -604,7 +583,7 @@
         var rr = r + ringOffset;
         ctx.save();
         ctx.lineWidth = ringStroke;
-        ctx.strokeStyle = (woodgrainOn || rockgrainOn) ? 'rgba(255,255,255,' + ringOpacity + ')'
+        ctx.strokeStyle = fg.puckCanvas ? 'rgba(255,255,255,' + ringOpacity + ')'
                                       : rgbString(fg.color, ringOpacity);
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -768,27 +747,30 @@
     }
 
     var activeMode = SurfaceMode.getActiveMode();
+    var stone = activeMode === SurfaceMode.MODES.STONE;
+    var drawnGL = false;
+
     if (activeMode !== SurfaceMode.MODES.COLOR) {
+      var grainEdge = Settings.get('flood_grain');
+      var ripple = Settings.get('wood_flood_ripple');
       var flood = null;
       if (floodActive && floodGrain) {
-        var grainEdge = Settings.get('flood_grain');
+        // Distance past the farthest corner the front must travel to leave no edge visible
+        var reach = feather * (1.1 + 1.25 * grainEdge + 0.3 * ripple);
         flood = {
           x: winnerFg.x, y: winnerFg.y,
-          r: discR + (far + feather * 1.5 - discR) * spread,
-          feather: feather, ripple: Settings.get('wood_flood_ripple'), grain: grainEdge,
-          species: floodGrain.species, rockType: floodGrain.rockType, seed: floodGrain.seed
+          r: discR + (far + reach - discR) * spread,
+          feather: feather, ripple: ripple, grain: grainEdge,
+          material: stone ? floodGrain.rockType : floodGrain.species,
+          seed: floodGrain.seed
         };
       }
       var tiltOn = Settings.bool('wood_tilt');
-      
-      // Preserve the old background wood/rock grain underneath the active flood by referencing floodTable
+      // Keep the previous table grain underneath the active flood
       var tGrain = (floodActive && floodTable) ? floodTable : currentTableGrain();
-      
-      TableManager.draw({
-        species: tGrain.species,
-        woodType: tGrain.species,
-        rockType: tGrain.rockType,
-        table: (Settings.bool('winner_bg_enabled') && (tGrain.species || tGrain.rockType)) ? (tGrain.species || tGrain.rockType) : null,
+
+      drawnGL = TableManager.draw({
+        material: stone ? tGrain.rockType : tGrain.species,
         seed: tGrain.seed,
         flood: flood,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
@@ -796,8 +778,11 @@
         sheen: Settings.get('wood_sheen'),
         vignette: Settings.get('wood_vignette')
       });
-    } else {
-      TableManager.draw({});
+    }
+
+    // Flat colour mode, or the GPU surface is unavailable: paint the table on the canvas
+    if (!drawnGL) {
+      TableManager.hide();
       if (floodActive) {
         ctx.fillStyle = rgbString(floodBase || currentBackgroundColor());
         ctx.fillRect(0, 0, w, h);
@@ -1070,7 +1055,7 @@
 
     groupOrder.forEach(function (groupKey) {
       var groupItems = Settings.SCHEMA.filter(function (s) { return s.group === groupKey; });
-      if (groupItems.length === 0) return;
+      if (groupItems.length === 0 && groupKey !== 'SYSTEM') return;
 
       var header = document.createElement('div');
       header.className = 'panel-group-title';
@@ -1211,8 +1196,8 @@
       TableManager.init(woodEl);
     }
     var fxEl = document.getElementById('fx');
-    if (fxEl && typeof WoodGrain !== 'undefined') {
-      fx = WoodGrain.createEffects(fxEl);
+    if (fxEl) {
+      fx = Effects.create(fxEl);
       fx.onRestore = requestDraw;
     }
 
