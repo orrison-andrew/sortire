@@ -3,8 +3,8 @@
  *
  * Exposes SurfaceMode:
  *   - MODES: { WOOD: 'WOOD', STONE: 'STONE', COLOR: 'COLOR' }
- *   - getActiveMode() -> returns current active mode string
- *   - setActiveMode(mode) -> sets active mode and updates settings presets
+ *   - getActiveMode() -> returns current active mode string ('WOOD' | 'STONE' | 'COLOR')
+ *   - setActiveMode(mode) -> sets active mode, updates presets & marker ring settings
  */
 (function (root) {
   'use strict';
@@ -16,12 +16,16 @@
   };
 
   function getActiveMode() {
-    if (Settings.bool('woodgrain_enabled')) return MODES.WOOD;
-    if (Settings.bool('rockgrain_enabled')) return MODES.STONE;
+    if (typeof Settings !== 'undefined') {
+      if (Settings.bool('woodgrain_enabled')) return MODES.WOOD;
+      if (Settings.bool('rockgrain_enabled')) return MODES.STONE;
+    }
     return MODES.COLOR;
   }
 
   function setActiveMode(mode) {
+    if (typeof Settings === 'undefined') return;
+
     if (mode === MODES.WOOD) {
       Settings.set('woodgrain_enabled', 1);
       Settings.set('rockgrain_enabled', 0);
@@ -34,6 +38,8 @@
       Settings.set('woodgrain_enabled', 0);
       Settings.set('rockgrain_enabled', 0);
       Settings.applyPreset('colors');
+      if (!Settings.bool('marker_enabled')) Settings.set('marker_enabled', 1);
+      if (!Settings.bool('ring_enabled')) Settings.set('ring_enabled', 1);
     }
   }
 

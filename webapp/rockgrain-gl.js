@@ -1,8 +1,8 @@
 /*
- * rockgrain-gl.js: GPU River Pebble & Natural Stone texture generator.
+ * rockgrain-gl.js: GPU River Pebble & Natural Slate Stone texture generator.
  *
  * Provides WebGL-accelerated rendering for natural river stones, pebbles,
- * and full-screen stone table surfaces with winner flood expansion support.
+ * and realistic split-face slate table surfaces with winner flood expansion.
  *
  * Exposes RockGrainGL:
  *   - TYPES / ROCK_TYPES
@@ -14,6 +14,16 @@
   'use strict';
 
   var TYPES = {
+    slatePebble: {
+      label: 'Natural Slate',
+      colorA: [65, 72, 78],
+      colorB: [35, 38, 42],
+      colorC: [105, 115, 122],
+      scale: 2.2,
+      roughness: 0.025,
+      speckle: 0.15,
+      foliation: 0.45
+    },
     riverPebble: {
       label: 'River Pebble',
       colorA: [155, 168, 175],
@@ -21,7 +31,8 @@
       colorC: [215, 220, 225],
       scale: 3.2,
       roughness: 0.04,
-      speckle: 0.4
+      speckle: 0.4,
+      foliation: 0.0
     },
     amberPebble: {
       label: 'Warm Terracotta',
@@ -30,7 +41,8 @@
       colorC: [245, 185, 120],
       scale: 2.8,
       roughness: 0.03,
-      speckle: 0.3
+      speckle: 0.3,
+      foliation: 0.0
     },
     granitePebble: {
       label: 'Speckled Granite',
@@ -39,16 +51,8 @@
       colorC: [170, 125, 115],
       scale: 4.0,
       roughness: 0.06,
-      speckle: 0.85
-    },
-    slatePebble: {
-      label: 'Slate Gray',
-      colorA: [80, 95, 110],
-      colorB: [45, 55, 65],
-      colorC: [130, 148, 165],
-      scale: 3.0,
-      roughness: 0.03,
-      speckle: 0.35
+      speckle: 0.85,
+      foliation: 0.0
     },
     basaltPebble: {
       label: 'Dark Basalt',
@@ -57,7 +61,8 @@
       colorC: [95, 100, 105],
       scale: 3.2,
       roughness: 0.05,
-      speckle: 0.45
+      speckle: 0.45,
+      foliation: 0.2
     },
     chalkPebble: {
       label: 'Chalk White',
@@ -66,7 +71,8 @@
       colorC: [250, 250, 248],
       scale: 2.5,
       roughness: 0.02,
-      speckle: 0.2
+      speckle: 0.2,
+      foliation: 0.0
     },
     mossPebble: {
       label: 'Green River Stone',
@@ -75,11 +81,12 @@
       colorC: [160, 180, 155],
       scale: 3.5,
       roughness: 0.04,
-      speckle: 0.5
+      speckle: 0.5,
+      foliation: 0.0
     }
   };
 
-  var ROCK_TYPES = ['riverPebble', 'amberPebble', 'granitePebble', 'slatePebble', 'basaltPebble', 'chalkPebble', 'mossPebble'];
+  var ROCK_TYPES = ['slatePebble', 'riverPebble', 'amberPebble', 'granitePebble', 'basaltPebble', 'chalkPebble', 'mossPebble'];
   var DISC_SIZE = 1024;
   var BG_SIZE   = 2048;
 
@@ -139,9 +146,7 @@
 
   function rgb01(arr) { return [arr[0] / 255, arr[1] / 255, arr[2] / 255]; }
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // Clean, Simple GPU Stone Texture Generator
-  // ═════════════════════════════════════════════════════════════════════════
+  // Smoother, cleaner slate fragment shader
   var GEN_FRAG = [
     '#ifdef GL_FRAGMENT_PRECISION_HIGH',
     'precision highp float;',
@@ -151,9 +156,9 @@
     '',
     'uniform float uSize;',
     'uniform vec3  uColorA, uColorB, uColorC;',
-    'uniform float uScale, uRoughness, uSpeckle;',
+    'uniform float uScale, uRoughness, uSpeckle, uFoliation;',
     'uniform vec2  uOffA, uOffB;',
-    'uniform vec3  uColorShift; // Hue/Sat/Val variation multiplier',
+    'uniform vec3  uColorShift;',
     '',
     'float hash(vec2 p) {',
     '  vec3 p3 = fract(vec3(p.xyx) * 0.1031);',
@@ -173,28 +178,11 @@
     '  return a + (b - a) * u.x + (c - a) * u.y + (a - b - c + d) * u.x * u.y;',
     '}',
     '',
-    'float voronoi(vec2 p, vec2 off) {',
-    '  p += off;',
-    '  vec2 n = floor(p);',
-    '  vec2 f = fract(p);',
-    '  float md = 8.0;',
-    '  for (int j = -1; j <= 1; j++) {',
-    '    for (int i = -1; i <= 1; i++) {',
-    '      vec2 g = vec2(float(i), float(j));',
-    '      vec2 o = vec2(hash(n + g), hash(n + g + 17.3));',
-    '      vec2 r = g + o - f;',
-    '      float d = dot(r, r);',
-    '      if (d < md) md = d;',
-    '    }',
-    '  }',
-    '  return sqrt(md);',
-    '}',
-    '',
     'float fbm(vec2 p, vec2 off) {',
     '  float s = 0.0, amp = 0.5;',
     '  for (int i = 0; i < 3; i++) {',
     '    s += amp * vnoise(p, off);',
-    '    p *= 2.0;',
+    '    p *= 1.8;',
     '    amp *= 0.5;',
     '  }',
     '  return s;',
@@ -204,31 +192,28 @@
     '  vec2 uv = gl_FragCoord.xy / uSize;',
     '  vec2 p = uv * uScale;',
     '  ',
-    '  // Soft natural mottling noise',
-    '  float n1 = fbm(p * 2.5, uOffA);',
-    '  float n2 = fbm(p * 5.0, uOffB);',
-    '  ',
-    '  vec3 col = mix(uColorA, uColorB, smoothstep(0.2, 0.8, n1));',
-    '  col = mix(col, uColorC, n2 * 0.35);',
-    '  ',
-    '  // Fine granite / quartz mineral flecks',
-    '  if (uSpeckle > 0.05) {',
-    '    float v = voronoi(p * 16.0, uOffA);',
-    '    col = mix(col, uColorB * 0.6, (1.0 - v) * uSpeckle * 0.5);',
+    '  float slateGrain = 0.0;',
+    '  if (uFoliation > 0.01) {',
+    '    vec2 sp = vec2(p.x * 0.5, p.y * 14.0);',
+    '    float f1 = fbm(sp, uOffA);',
+    '    slateGrain = (f1 - 0.5) * uFoliation;',
     '  }',
     '  ',
-    '  // Micro stone surface grain',
+    '  float n1 = fbm(p * 1.8 + vec2(0.0, slateGrain * 0.2), uOffA);',
+    '  float n2 = fbm(p * 3.5, uOffB);',
+    '  ',
+    '  vec3 col = mix(uColorA, uColorB, smoothstep(0.2, 0.8, n1 + slateGrain * 0.3));',
+    '  col = mix(col, uColorC, (n2 + slateGrain * 0.15) * 0.25);',
+    '  ',
     '  float micro = (hash(gl_FragCoord.xy) - 0.5) * uRoughness;',
     '  col = clamp(col + vec3(micro), 0.0, 1.0);',
-    '  ',
-    '  // Apply procedural color variation shift',
     '  col = clamp(col * uColorShift, 0.0, 1.0);',
     '  ',
     '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
 
-  var GEN_UNIFORMS = ['uSize', 'uColorA', 'uColorB', 'uColorC', 'uScale', 'uRoughness', 'uSpeckle', 'uOffA', 'uOffB', 'uColorShift'];
+  var GEN_UNIFORMS = ['uSize', 'uColorA', 'uColorB', 'uColorC', 'uScale', 'uRoughness', 'uSpeckle', 'uFoliation', 'uOffA', 'uOffB', 'uColorShift'];
 
   var gen = null;
   var genFailed = false;
@@ -236,7 +221,7 @@
   function initGen() {
     if (gen && gen.gl && !gen.gl.isContextLost()) return gen;
     gen = null;
-    if (genFailed) return null;
+    genFailed = false;
     try {
       var canvas = document.createElement('canvas');
       canvas.width = canvas.height = 16;
@@ -264,7 +249,7 @@
     if (!g) return null;
     var gl = g.gl, loc = g.P.loc;
     try {
-      var t = TYPES[typeName] || TYPES.riverPebble;
+      var t = TYPES[typeName] || TYPES.slatePebble;
       var cA = rgb01(t.colorA), cB = rgb01(t.colorB), cC = rgb01(t.colorC);
       colorShift = colorShift || [1.0, 1.0, 1.0];
 
@@ -279,6 +264,7 @@
       gl.uniform1f(loc.uScale, t.scale);
       gl.uniform1f(loc.uRoughness, t.roughness);
       gl.uniform1f(loc.uSpeckle, t.speckle);
+      gl.uniform1f(loc.uFoliation, t.foliation || 0);
       gl.uniform2f(loc.uOffA, (seed * 17) % 100 + 1.3, (seed * 31) % 100 + 2.4);
       gl.uniform2f(loc.uOffB, (seed * 43) % 100 + 3.7, (seed * 71) % 100 + 4.1);
       gl.uniform3f(loc.uColorShift, colorShift[0], colorShift[1], colorShift[2]);
@@ -296,7 +282,7 @@
   }
 
   function flatTexture(typeName, size) {
-    var t = TYPES[typeName] || TYPES.riverPebble;
+    var t = TYPES[typeName] || TYPES.slatePebble;
     var c = document.createElement('canvas');
     c.width = c.height = Math.min(size, 256);
     var ctx = c.getContext('2d');
@@ -309,19 +295,15 @@
   }
 
   function generate(name, size, seed, colorShift) {
-    name = TYPES[name] ? name : 'riverPebble';
+    name = TYPES[name] ? name : 'slatePebble';
     size = size || 1024;
     seed = seed || 1;
     return generateGL(name, size, seed, colorShift) || flatTexture(name, size);
   }
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // Texture Caches
-  // ═════════════════════════════════════════════════════════════════════════
   var discTexCache = {};
   function getDiscTexture(typeName, seed) {
     var rand = mulberry32(seed * 777 + typeName.length);
-    // Procedural color variation per stone
     var rVar = 0.82 + rand() * 0.36;
     var gVar = 0.82 + rand() * 0.36;
     var bVar = 0.82 + rand() * 0.36;
@@ -334,7 +316,7 @@
 
   var bgTexCache = {};
   function getMasterTexture(typeName, seed) {
-    typeName = TYPES[typeName] ? typeName : 'riverPebble';
+    typeName = TYPES[typeName] ? typeName : 'slatePebble';
     seed = (seed || 42) | 0;
     var key = typeName + '_' + seed;
     if (!bgTexCache[key]) {
@@ -343,11 +325,7 @@
     return bgTexCache[key];
   }
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // Organic River Pebble Puck Mask & Shading (Canvas 2D Clipping & Gloss)
-  // ═════════════════════════════════════════════════════════════════════════
   function drawPebbleShading(ctx, r, diameter) {
-    var TAU = Math.PI * 2;
     var edgeGrad = ctx.createRadialGradient(r, r, r * 0.5, r, r, r);
     edgeGrad.addColorStop(0, 'rgba(0,0,0,0)');
     edgeGrad.addColorStop(1, 'rgba(0,0,0,0.40)');
@@ -371,7 +349,7 @@
 
   function getDiscCanvas(diameter, typeName, seed, shadeShift) {
     diameter   = Math.max(32, diameter | 0);
-    typeName   = TYPES[typeName] ? typeName : 'riverPebble';
+    typeName   = TYPES[typeName] ? typeName : 'slatePebble';
     seed       = (seed || 1) | 0;
     shadeShift = shadeShift || 0;
 
@@ -387,7 +365,6 @@
     var ctx = c.getContext('2d');
     var r   = diameter / 2;
 
-    // Organic river pebble path
     ctx.save();
     ctx.beginPath();
     var points = 24;
@@ -401,7 +378,7 @@
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
-    ctx.clip(); // Clean 2D clip path
+    ctx.clip();
 
     ctx.translate(r, r);
     ctx.rotate(rand() * TAU);
@@ -439,9 +416,7 @@
     return c;
   }
 
-  // ═════════════════════════════════════════════════════════════════════════
-  // Live Table Layer Shader with WINNER FLOOD SUPPORT matching WoodGrain API
-  // ═════════════════════════════════════════════════════════════════════════
+  // Improved stone recoloration shader with rich tone mapping
   var BG_FRAG = [
     '#ifdef GL_FRAGMENT_PRECISION_HIGH',
     'precision highp float;',
@@ -450,28 +425,34 @@
     '#endif',
     'uniform sampler2D uTex, uTex2;',
     'uniform vec2 uRes, uOrigin, uDraw, uFloodC, uTilt;',
+    'uniform vec3 uSrcL, uSrcD, uFlL, uFlD;',
     'uniform float uFloodOn, uFloodTex, uFloodR, uFloodF, uRipple, uTime, uSheen, uVig;',
+    '',
+    'vec3 recolor(vec3 c, vec3 tL, vec3 tD) {',
+    '  float lum = dot(c, vec3(0.299, 0.587, 0.114));',
+    '  vec3 target = mix(tD, tL, smoothstep(0.1, 0.85, lum));',
+    '  return mix(c, target * (0.7 + 0.6 * lum), 0.82);',
+    '}',
     '',
     'void main() {',
     '  vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);',
     '  vec2 tc = (p - uOrigin) / uDraw;',
-    '  vec3 col = texture2D(uTex, tc).rgb;',
+    '  vec3 tex = texture2D(uTex, tc).rgb;',
+    '  vec3 col = tex;',
     '',
-    '  // Winner flood expansion out like woodgrain!',
     '  if (uFloodOn > 0.5) {',
     '    vec2 dv = p - uFloodC;',
     '    float dist = length(dv);',
     '    float ang = atan(dv.y, dv.x + 0.0001);',
-    '    float f = max(uFloodF, 1.0);',
-    '    vec3 fl = texture2D(uTex2, tc).rgb;',
-    '    float edge = uFloodR + uRipple * 0.25 * f * sin(ang * 9.0 + uTime * 5.0);',
+    '    float f = max(uFloodF, 2.0);',
+    '    vec3 fl = (uFloodTex > 0.5) ? texture2D(uTex2, tc).rgb : recolor(tex, uFlL, uFlD);',
+    '    float edge = uFloodR + uRipple * 0.25 * f * sin(ang * 9.0 + uTime * 3.5);',
     '    float mask = 1.0 - smoothstep(edge - f, edge, dist);',
     '    col = mix(col, fl, mask);',
     '    float q = (dist - (edge - f * 0.5)) / max(f * 0.6, 1.0);',
     '    col += exp(-q * q) * uRipple * 0.12;',
     '  }',
     '',
-    '  // Soft sheen following tilt',
     '  float lum = dot(col, vec3(0.299, 0.587, 0.114));',
     '  vec2 q2 = p / uRes;',
     '  vec2 c = vec2(0.5 + uTilt.x * 0.35 + 0.08 * sin(uTime * 0.6), 0.38 + uTilt.y * 0.25 + 0.05 * cos(uTime * 0.4));',
@@ -479,7 +460,6 @@
     '  float g = exp(-dot(dq, dq) / 0.10);',
     '  col += g * uSheen * 0.25 * (0.6 + 0.8 * lum) * vec3(1.0, 0.98, 0.92);',
     '',
-    '  // Vignette',
     '  vec2 pc = p - uRes * 0.5;',
     '  float r0 = min(uRes.x, uRes.y) * 0.3;',
     '  float r1 = max(uRes.x, uRes.y) * 0.75;',
@@ -490,7 +470,11 @@
     '}'
   ].join('\n');
 
-  var BG_UNIFORMS = ['uTex', 'uTex2', 'uRes', 'uOrigin', 'uDraw', 'uFloodC', 'uFloodOn', 'uFloodTex', 'uFloodR', 'uFloodF', 'uRipple', 'uTilt', 'uTime', 'uSheen', 'uVig'];
+  var BG_UNIFORMS = [
+    'uTex', 'uTex2', 'uRes', 'uOrigin', 'uDraw', 'uSrcL', 'uSrcD',
+    'uFlL', 'uFlD', 'uFloodC', 'uFloodOn', 'uFloodTex', 'uFloodR', 'uFloodF', 'uRipple',
+    'uTilt', 'uTime', 'uSheen', 'uVig'
+  ];
 
   function createBackground(container) {
     var cv = document.createElement('canvas');
@@ -557,7 +541,7 @@
         if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
         gl.viewport(0, 0, pw, ph);
 
-        var species = TYPES[s.species] ? s.species : 'riverPebble';
+        var species = TYPES[s.species] ? s.species : 'slatePebble';
         var seed = (s.seed || 42) | 0;
         var key = species + '_' + seed;
 
@@ -599,12 +583,19 @@
         gl.uniform2f(P.loc.uOrigin, (pw - dw) / 2, (ph - dh) / 2);
         gl.uniform2f(P.loc.uDraw, dw, dh);
 
-        gl.uniform1f(P.loc.uFloodOn, fl ? 1 : 0);
-        gl.uniform1f(P.loc.uFloodTex, own ? 1 : 0);
-        gl.uniform2f(P.loc.uFloodC, fl ? fl.x * dpr : 0, fl ? fl.y * dpr : 0);
-        gl.uniform1f(P.loc.uFloodR, fl ? fl.r * dpr : 0);
-        gl.uniform1f(P.loc.uFloodF, fl ? Math.max(1, (fl.feather || 0) * dpr) : 1);
-        gl.uniform1f(P.loc.uRipple, fl ? (fl.ripple || 0) : 0);
+        var src = TYPES[species], c;
+        c = rgb01(src.colorA); gl.uniform3f(P.loc.uSrcL, c[0], c[1], c[2]);
+        c = rgb01(src.colorB); gl.uniform3f(P.loc.uSrcD, c[0], c[1], c[2]);
+
+        var ft = fl && TYPES[fl.species];
+        gl.uniform1f(P.loc.uFloodOn, ft ? 1.0 : 0.0);
+        gl.uniform1f(P.loc.uFloodTex, own ? 1.0 : 0.0);
+        c = rgb01((ft || src).colorA); gl.uniform3f(P.loc.uFlL, c[0], c[1], c[2]);
+        c = rgb01((ft || src).colorB); gl.uniform3f(P.loc.uFlD, c[0], c[1], c[2]);
+        gl.uniform2f(P.loc.uFloodC, ft ? fl.x * dpr : 0, ft ? fl.y * dpr : 0);
+        gl.uniform1f(P.loc.uFloodR, ft ? fl.r * dpr : 0);
+        gl.uniform1f(P.loc.uFloodF, ft ? Math.max(1, (fl.feather || 0) * dpr) : 1);
+        gl.uniform1f(P.loc.uRipple, ft ? (fl.ripple || 0) : 0);
 
         gl.uniform2f(P.loc.uTilt, s.tiltX || 0, s.tiltY || 0);
         gl.uniform1f(P.loc.uTime, s.time || 0);
@@ -632,7 +623,7 @@
   }
 
   function getBaseColor(name) {
-    var t = TYPES[name] || TYPES.riverPebble;
+    var t = TYPES[name] || TYPES.slatePebble;
     return {
       r: Math.round((t.colorA[0] + t.colorB[0]) / 2),
       g: Math.round((t.colorA[1] + t.colorB[1]) / 2),

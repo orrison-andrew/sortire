@@ -1,6 +1,6 @@
 /**
- * table.js: Unified Table Surface & Arena rendering manager.
- * Draws table surface (Wood, Stone, or Solid Color) and manages full-screen flood expansion.
+ * table.js: Unified Table Surface & Arena rendering manager for Sortire.
+ * Manages dual WebGL background layers (Wood & Stone) inside the #wood-bg container.
  *
  * Exposes TableManager:
  *   - init(containerEl)
@@ -11,49 +11,71 @@
 
   var woodBg = null;
   var rockBg = null;
+  var woodLayerEl = null;
+  var rockLayerEl = null;
   var container = null;
 
   function init(containerEl) {
+    if (!containerEl) return;
     container = containerEl;
-    if (containerEl && typeof WoodGrain !== 'undefined') {
-      woodBg = WoodGrain.createBackground(containerEl);
+    container.innerHTML = '';
+
+    woodLayerEl = document.createElement('div');
+    woodLayerEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:none;';
+    container.appendChild(woodLayerEl);
+
+    rockLayerEl = document.createElement('div');
+    rockLayerEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;display:none;';
+    container.appendChild(rockLayerEl);
+
+    if (typeof WoodGrain !== 'undefined') {
+      woodBg = WoodGrain.createBackground(woodLayerEl);
     }
-    if (containerEl && typeof RockGrainGL !== 'undefined') {
-      rockBg = RockGrainGL.createBackground(containerEl);
+    if (typeof RockGrainGL !== 'undefined') {
+      rockBg = RockGrainGL.createBackground(rockLayerEl);
     }
   }
 
   function draw(s) {
-    var mode = SurfaceMode.getActiveMode();
+    var mode = SurfaceMode ? SurfaceMode.getActiveMode() : 'COLOR';
     if (!container) return;
 
-    if (mode === SurfaceMode.MODES.WOOD && woodBg) {
+    if (mode === 'WOOD' && woodBg) {
       container.style.display = 'block';
+      if (woodLayerEl) woodLayerEl.style.display = 'block';
+      if (rockLayerEl) rockLayerEl.style.display = 'none';
+
       woodBg.draw({
-        species: s.species,
-        seed: s.seed,
-        table: s.table,
-        flood: s.flood,
-        time: s.time,
-        tiltX: s.tiltX,
-        tiltY: s.tiltY,
-        sheen: s.sheen,
-        vignette: s.vignette
+        species: s.woodType || 'walnut',
+        seed: s.seed || 42,
+        table: s.table || null,
+        flood: s.flood || null,
+        time: s.time || 0,
+        tiltX: s.tiltX || 0,
+        tiltY: s.tiltY || 0,
+        sheen: s.sheen !== undefined ? s.sheen : 0.4,
+        vignette: s.vignette !== undefined ? s.vignette : 0.28
       });
-    } else if (mode === SurfaceMode.MODES.STONE && rockBg) {
+    } else if (mode === 'STONE' && rockBg) {
       container.style.display = 'block';
+      if (rockLayerEl) rockLayerEl.style.display = 'block';
+      if (woodLayerEl) woodLayerEl.style.display = 'none';
+
       rockBg.draw({
-        species: s.rockType || 'riverPebble',
-        seed: s.seed,
-        flood: s.flood,
-        time: s.time,
-        tiltX: s.tiltX,
-        tiltY: s.tiltY,
-        sheen: s.sheen,
-        vignette: s.vignette
+        species: s.rockType || 'slatePebble',
+        seed: s.seed || 42,
+        table: s.table || null,
+        flood: s.flood || null,
+        time: s.time || 0,
+        tiltX: s.tiltX || 0,
+        tiltY: s.tiltY || 0,
+        sheen: s.sheen !== undefined ? s.sheen : 0.4,
+        vignette: s.vignette !== undefined ? s.vignette : 0.28
       });
     } else {
       container.style.display = 'none';
+      if (woodLayerEl) woodLayerEl.style.display = 'none';
+      if (rockLayerEl) rockLayerEl.style.display = 'none';
     }
   }
 

@@ -153,12 +153,12 @@
 
   function getBaseWoodTypeKey() {
     var idx = Math.round(Settings.get('wood_type'));
-    return WoodGrain.getSpeciesKey(idx);
+    return WoodGrain.getSpeciesKey ? WoodGrain.getSpeciesKey(idx) : WoodGrain.SPECIES_KEYS[idx] || 'walnut';
   }
 
   function getBaseRockTypeKey() {
     var idx = Math.round(Settings.get('rock_type'));
-    return RockGrainGL.getTypeKey(idx);
+    return RockGrainGL.getTypeKey ? RockGrainGL.getTypeKey(idx) : RockGrainGL.ROCK_TYPES[idx] || 'slatePebble';
   }
 
   function haptic(type) {
@@ -189,10 +189,10 @@
     if (Settings.bool('winner_bg_enabled') && lastWinnerWood) {
       return { species: lastWinnerWood, seed: lastWinnerSeed };
     }
-    return { species: getBaseWoodTypeKey(), seed: bgSeed };
+    return { species: getBaseWoodTypeKey(), rockType: getBaseRockTypeKey(), seed: bgSeed };
   }
 
-  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeOut(t) { return 1 - Math.pow(1 - t, 2.5); }
 
   var tilt = { x: 0, y: 0, settled: false, pending: false };
 
@@ -297,7 +297,12 @@
     phase = 'WAITING';
     palette = new Palette();
 
-    if (!Settings.bool('winner_bg_enabled')) bgSeed = Math.floor(Math.random() * 100000) + 1;
+    if (!Settings.bool('winner_bg_enabled')) {
+      lastWinnerWood = null;
+      lastWinnerSeed = 0;
+      lastWinnerColor = null;
+      bgSeed = Math.floor(Math.random() * 100000) + 1;
+    }
 
     if (fx) fx.stop();
     requestDraw();
@@ -311,14 +316,15 @@
     if (currentMode === MODES.FIRST) {
       winnerId = ids[Math.floor(Math.random() * ids.length)];
       var growMs = winnerGrowMs();
-      animationEnd = now + Math.max(growMs, Settings.get('flood_ms'), 800);
+      var floodSpreadMs = Math.max(1800, Settings.get('flood_ms') * 2.2); // Graceful, slower flood spread
+      animationEnd = now + Math.max(growMs, floodSpreadMs, 1200);
 
       var w = fingers[winnerId];
       if (w) {
         floodBase = currentBackgroundColor();
         floodTable = currentTableGrain();
         floodGrain = {
-          species: w.discSpecies,
+          species: Settings.bool('rockgrain_enabled') ? w.discRockType : w.discSpecies,
           rockType: w.discRockType,
           seed: Math.floor(Math.random() * 100000) + 1
         };
@@ -412,7 +418,7 @@
     }
 
     var discWood = pickDiscWood();
-    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'riverPebble';
+    var discRock = typeof RockGrainGL !== 'undefined' ? pickDiscRock() : 'slatePebble';
     var shadeShift = (Math.random() * 0.5 - 0.25);
     var seed = Math.floor(Math.random() * 100000);
     var color = palette.color(nextColorIndex++);
@@ -742,8 +748,8 @@
       var e = (now - resultStart) / 1000;
       var growS = winnerGrowMs() / 1000;
       grow = easeOut((growS <= 0) ? 1 : Math.min(1, e / growS));
-      var spreadS = Settings.get('flood_ms') / 1000;
-      spread = easeOut((spreadS <= 0) ? 1 : Math.min(1, e / spreadS));
+      var spreadS = Math.max(1.8, Settings.get('flood_ms') * 2.2 / 1000); // Smoother, slower spread rate
+      spread = easeOut(Math.min(1, e / spreadS));
       discR = Settings.get('radius') * winnerScale(grow);
       far = Math.max(
         Math.hypot(winnerFg.x, winnerFg.y),
@@ -755,7 +761,6 @@
 
     var activeMode = SurfaceMode.getActiveMode();
     if (activeMode !== SurfaceMode.MODES.COLOR) {
-      var tableGrain = currentTableGrain();
       var flood = null;
       if (floodActive && floodGrain) {
         var grainEdge = Settings.get('flood_grain');
@@ -768,9 +773,10 @@
       }
       var tiltOn = Settings.bool('wood_tilt');
       TableManager.draw({
-        species: tableGrain.species,
-        rockType: getBaseRockTypeKey(),
-        seed: tableGrain.seed,
+        woodType: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : getBaseWoodTypeKey(),
+        rockType: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : 'slatePebble',
+        table: (Settings.bool('winner_bg_enabled') && lastWinnerWood) ? lastWinnerWood : null,
+        seed: (Settings.bool('winner_bg_enabled') && lastWinnerSeed) ? lastWinnerSeed : bgSeed,
         flood: flood,
         time: Settings.bool('wood_sheen_anim') ? now / 1000 : 0,
         tiltX: tiltOn ? tilt.x : 0, tiltY: tiltOn ? tilt.y : 0,
@@ -1087,7 +1093,7 @@
             if (s.key === 'sound_style') {
               SoundManager.playPop(idx);
             }
-            if (s.resetsRound) reset(); else requestDraw();
+            if (s.key === 'wood_type' || s.key === 'rock_type' || s.resetsRound) reset(); else requestDraw();
           });
           control.appendChild(select);
 
