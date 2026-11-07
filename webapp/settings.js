@@ -466,6 +466,26 @@
     return { ok: true };
   }
 
+  // Fully random tuning for the current surface: every setting that surface owns and
+  // shows gets a random value within its own range (shared audio / timing are untouched)
+  function randomize() {
+    var mode = currentMode();
+    SETTINGS_SCHEMA.forEach(function (s) {
+      if (!s.perSurface || s.hidden) return;
+      if (s.modes && s.modes.indexOf(mode) < 0) return;
+      var v;
+      if (s.isBool) {
+        v = Math.random() < 0.5 ? 1 : 0;
+      } else {
+        var n = Math.round((s.max - s.min) / s.step);
+        v = Math.round((s.min + Math.round(Math.random() * n) * s.step) * 1e6) / 1e6;
+      }
+      state[s.key] = v;
+    });
+    save(true);
+    notify('all', null);
+  }
+
   // ── Saved tunings (each belongs to one surface) ───────────────────────────
   function allSaved() {
     try {
@@ -526,6 +546,7 @@
     deleteSaved: deleteSaved,
     renameSaved: renameSaved,
     flush: flush,
+    randomize: randomize,
     addChangeListener: function (cb) { listeners.push(cb); }
   };
 })();

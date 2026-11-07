@@ -71,7 +71,7 @@ Each surface's tuning is captured in one **settings code**, a short string of le
 
 - **Copy code** copies it so you can send it to someone. They tap **Import**, paste it, and get exactly your tuning.
 - **Save this tuning** keeps it in your own list with a name you choose. Tap a saved tuning to apply it, ✎ to rename it, ✕ to delete it. Saved tunings stay on your device.
-- **Shuffle** (shown when the shared list exists) tries a random tuning from the shared list.
+- **Shuffle** applies a fully random set of settings for the current surface (material, lighting, winner effects, colors, finger look). Sound, timing and instruction text are left alone. Press it again for another; use **Save this tuning** to keep one you like.
 
 Codes made by older versions of the app keep working after updates. Settings added later simply use their defaults.
 
@@ -115,7 +115,7 @@ When a new version is ready, a pill that says **"New version available"** appear
 - **`CODE_FIELDS` is append-only once codes are released.** Until the first public release the layout may still change (codes made before such a change stop working).
 - **`CODE_FIELDS` is append-only.** Never reorder, edit or delete an entry. A new setting goes on the end, and its schema entry gets added in the same change. Only per-surface settings are stored in codes; shared ones (audio, timing, instruction text, keep awake) are written as defaults.
 - If you keep a codec test (for example `tools/settings-codec.test.js`), make sure it matches this format: round-trips, an older shorter code, and a "golden" code that must always decode the same way. Run it before releasing a change to `settings.js`.
-- `codes.txt` is an optional shared list: one code per line, nothing else. The **Shuffle** button picks from it. To add a tuning, paste its code on a new line. Lines starting with `#` are comments, and codes in the old hex format are ignored. **Shuffle** only uses codes for the surface you are on.
+- `codes.txt` only lists the built-in default code for each surface, for reference. The app does not read it.
 
 ### Code layout (for developers)
 Scripts load in this order (see `index.html`); each one only uses the ones above it.

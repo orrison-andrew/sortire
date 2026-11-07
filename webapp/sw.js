@@ -21,7 +21,6 @@ const CORE_ASSETS = [
 ];
 
 const OPTIONAL_ASSETS = [
-  './codes.txt',
   './icons/icon-192.png',
   './icons/icon-round-192.png',
   './icons/icon-512.png',
@@ -55,8 +54,8 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Cache-first from this version's own cache. Files are never rewritten in place
-// (that could mix new and old files); only codes.txt refreshes in the background.
+// Cache-first from this version's own cache. Files are never rewritten in place,
+// because that could mix new and old files.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
@@ -65,12 +64,6 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(CACHE_NAME);
     const hit = await cache.match(req, { ignoreSearch: true });
 
-    if (req.url.split('?')[0].endsWith('/codes.txt')) {
-      const net = fetch(req, { cache: 'no-cache' })
-        .then((r) => { if (r && r.ok) cache.put(req, r.clone()); return r; })
-        .catch(() => hit);
-      return hit || net;
-    }
     return hit || fetch(req);
   })());
 });

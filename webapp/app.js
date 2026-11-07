@@ -1027,13 +1027,6 @@
     if (set && set.warm) set.warm();
   }
 
-  var communityCodes = [];
-
-  function communityPool() {
-    var mode = Settings.getMode();
-    return communityCodes.filter(function (c) { return Settings.modeOfCode(c) === mode; });
-  }
-
   function fallbackCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text;
@@ -1073,20 +1066,6 @@
     buildTuningPanel();
     reset();
     return true;
-  }
-
-  function loadCommunityCodes() {
-    if (!window.fetch) return;
-    fetch('codes.txt', { cache: 'no-cache' })
-      .then(function (r) { return r.ok ? r.text() : ''; })
-      .then(function (t) {
-        communityCodes = t.split(/\r?\n/)
-          .map(function (l) { return l.trim(); })
-          .filter(function (l) { return l && l.charAt(0) !== '#' && Settings.decode(l).ok; });
-        var b = document.getElementById('code-shuffle');
-        if (b) b.style.display = communityPool().length ? '' : 'none';
-      })
-      .catch(function () {});
   }
 
   function renderSavedList(wrap) {
@@ -1190,17 +1169,15 @@
 
     var shuffleBtn = document.createElement('button');
     shuffleBtn.type = 'button';
-    shuffleBtn.id = 'code-shuffle';
     shuffleBtn.className = 'panel-btn';
     shuffleBtn.textContent = 'Shuffle';
-    shuffleBtn.title = 'Try a random tuning from the shared list';
-    shuffleBtn.style.display = communityPool().length ? '' : 'none';
+    shuffleBtn.title = 'Apply a fully random set of settings for this surface';
     shuffleBtn.addEventListener('click', function () {
       SoundManager.playClick();
-      var cur = Settings.currentCode();
-      var pool = communityPool().filter(function (c) { return c.toUpperCase() !== cur; });
-      if (!pool.length) return;
-      applyCodeAndRefresh(pool[Math.floor(Math.random() * pool.length)]);
+      Settings.randomize();
+      clearWinnerTable();
+      buildTuningPanel();
+      reset();
     });
 
     var importBtn = document.createElement('button');
@@ -1528,7 +1505,6 @@
     });
     document.addEventListener('visibilitychange', syncWakeLock);
     whenIdle(warmAtlases);
-    loadCommunityCodes();
     setupServiceWorker();
     requestDraw();
   }
