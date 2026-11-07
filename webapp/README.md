@@ -61,7 +61,7 @@ You can skip installing and just keep using the link in your browser.
 No touchscreen? On a computer, click to place a finger. Hold **Shift** while clicking to place several at once.
 
 ### Settings
-Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The first setting is **Surface**: **Color** (flat colored circles), **Wood** or **Stone**. Each surface keeps its own settings (materials, lighting, winner effects, colors, finger look), so changing one never disturbs the others; sound, timing and instruction text are shared. Rows that don't apply to a surface are hidden (for example the winner marker ring is Color only). Wood and stone give the textured-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood spread time**, **Flood edge softness**, **Flood edge ripple** and **Flood edge follows new grain** shape how it spreads, and **Winner grows** only controls the winning disc. Other sections cover the countdown length, sounds and vibration. **Reset** puts everything back to the defaults.
+Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. The first setting is **Surface**: **Color** (flat colored circles), **Wood** or **Stone**. Each surface keeps its own settings (materials, lighting, winner effects, colors, finger look), so changing one never disturbs the others; sound, timing and instruction text are shared. Rows that don't apply to a surface are hidden (for example the winner marker ring is Color only). Wood and stone give the textured-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood duration**, **Flood edge softness**, **Flood ripple intensity** and **Flood shows underlying grain** shape how it spreads, and **Winner grows** only controls the winning disc. **Disc shadow** sets how dark the shadow under each wood or stone disc is. Other sections cover the countdown length, **Volume** and sounds, vibration, and **Keep screen on** (stops the screen from dimming while the app is open). Every setting has a one-line explanation under its name, and settings that only matter in one game mode (winner effects for **Pick one**, reveal timing for **Order all**) are hidden in the other. **Reset** puts everything back to the defaults.
 
 ### Share and save your tunings
 Each surface's tuning is captured in one **settings code**, a short string of letters and numbers shown at the top of the settings panel (under **Share & Saved Tunings**).
@@ -78,7 +78,7 @@ The first time you tap, your iPhone may ask to use motion sensors. If you allow 
 ---
 
 ## Updates
-When a new version is ready, a pill that says **"New version available"** appears with an **Update** button. Tap it and the app reloads with the latest version.
+When a new version is ready, a pill that says **"New version available"** appears with an **Update** button. Tap it and the app reloads with the latest version. A new version never replaces the running one by itself, so a round is never interrupted.
 
 ## Troubleshooting
 
@@ -89,7 +89,7 @@ When a new version is ready, a pill that says **"New version available"** appear
 | It looks like an old version | Close the app completely and reopen it, or tap **Update** if you see it. Still stuck? Remove the app and add it again. |
 | The wood background looks flat or effects are missing | Your device's graphics don't support the fancy effects. Everything else still works. |
 | Fingers aren't all detected | Some phones only track a limited number of touches. Try fewer fingers, and keep them apart. |
-| A settings code says it is damaged | It was probably cut off when copying. Copy the whole code again. |
+| A settings code says it is damaged, too short, or not a settings code | It was probably cut off or changed when copying. Copy the whole code again. Codes only use the letters A-Z and the digits 2-7. |
 
 ## Removing the app
 - **iPhone:** press and hold the icon, then tap **Remove App**.
@@ -103,15 +103,16 @@ When a new version is ready, a pill that says **"New version available"** appear
 - A PWA must be served over **HTTPS**. Any static host works: GitHub Pages, Netlify, Cloudflare Pages, or your own server. Upload the contents of this folder so that `index.html` is at the root of your URL.
 - **GitHub Pages:** in the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**. The workflow in `.github/workflows/deploy-pwa.yml` deploys the `webapp` folder on every push to `main`.
 - Replace `https://YOUR-APP-URL-HERE/` at the top of this file with your real address.
-- When you change any file, bump `CACHE_NAME` in `sw.js` (for example `sortire-pwa-v19`). This is how installed copies know to update.
+- The deploy workflow stamps `CACHE_NAME` in `sw.js` with the commit ID on every deploy, and checks that every file in the precache list exists. This is how installed copies know to update. If you host somewhere else, change `CACHE_NAME` by hand on every release (for example `sortire-pwa-v20`).
+- Do not deploy `rockgrain-gl.js` or `settings.js.bak`: nothing loads them and they can be deleted from the repository.
 - The app makes no network requests of its own beyond loading its own files: no analytics, no tracking, no accounts. The service worker only caches the app's own files.
 
 ### Settings codes (for developers)
-- Format: `[format byte][field count][packed values][crc8]` as hex. See the comment block above `CODE_FIELDS` in `settings.js`.
+- Format: a base32 string (letters A-Z and digits 2-7). Each entry of `CODE_FIELDS` is packed into just enough bits and the bits are written in order, 5 per character. There is no checksum: a code is rejected if it contains other characters or is shorter than 10 characters. If a code is shorter than the current layout (made by an older version), the missing fields use their defaults.
 - **`CODE_FIELDS` is append-only once codes are released.** Until the first public release the layout may still change (codes made before such a change stop working).
-- **`CODE_FIELDS` is append-only.** Never reorder, edit or delete an entry. A new setting goes on the end, and its schema entry gets added in the same change. A warning in the browser console tells you if you forget.
-- `node tools/settings-codec.test.js` checks round-trips, old and newer codes and a "golden" code that must always decode the same way. Run it before releasing a change to `settings.js`.
-- `codes.txt` is an optional shared list: one code per line, nothing else. The **Shuffle** button picks from it. To add a tuning, paste its code on a new line.
+- **`CODE_FIELDS` is append-only.** Never reorder, edit or delete an entry. A new setting goes on the end, and its schema entry gets added in the same change. Only per-surface settings are stored in codes; shared ones (audio, timing, instruction text, keep awake) are written as defaults.
+- If you keep a codec test (for example `tools/settings-codec.test.js`), make sure it matches this format: round-trips, an older shorter code, and a "golden" code that must always decode the same way. Run it before releasing a change to `settings.js`.
+- `codes.txt` is an optional shared list: one code per line, nothing else. The **Shuffle** button picks from it. To add a tuning, paste its code on a new line. Lines starting with `#` are comments, and codes in the old hex format are ignored. **Shuffle** only uses codes for the surface you are on.
 
 ### Code layout (for developers)
 Scripts load in this order (see `index.html`); each one only uses the ones above it.

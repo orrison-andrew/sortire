@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "Sortire",
   "short_name": "Sortire",
   "description": "Put every finger on the screen. Sortire decides who goes first.",
@@ -27,12 +28,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     },
     {
       "src": "icons/icon.svg",

@@ -17,6 +17,7 @@
  *   generate(k, size, seed) -> <canvas> (never null: falls back to a flat gradient)
  *   master(k, seed)         -> table-size texture (small LRU)
  *   getDiscCanvas(diameter, k, seed, shade) -> shaded puck <canvas> (LRU)
+ *   warm(k)                 -> pre-generate the disc atlas for a material
  *   createBackground(container) -> TableLayer
  */
 (function (root) {
@@ -82,7 +83,8 @@
       getColors: getColors,
       generate: generate,
       master: master,
-      getDiscCanvas: getDiscCanvas
+      getDiscCanvas: getDiscCanvas,
+      warm: function (k) { atlas(hasKey(k) ? k : keys[0]); }   // pre-generate a disc atlas
     };
     api.createBackground = function (container) { return TableLayer.create(container, api); };
     return api;

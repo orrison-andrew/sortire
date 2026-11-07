@@ -118,7 +118,7 @@
     L.draw = function (s) {
       if (failed || lost || !gl || gl.isContextLost()) return false;
       try {
-        var dpr = window.devicePixelRatio || 1;
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);   // the grain texture is 2048px; more pixels add cost, not detail
         var w = container.offsetWidth || window.innerWidth;
         var h = container.offsetHeight || window.innerHeight;
         var pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));

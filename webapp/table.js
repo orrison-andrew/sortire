@@ -39,10 +39,12 @@
     return layers[mode];
   }
 
+  function setDisplay(el, v) { if (el.style.display !== v) el.style.display = v; }
+
   function hide() {
     if (!container) return;
-    container.style.display = 'none';
-    for (var m in layers) layers[m].el.style.display = 'none';
+    setDisplay(container, 'none');
+    for (var m in layers) setDisplay(layers[m].el, 'none');
   }
 
   function draw(s) {
@@ -51,8 +53,8 @@
     var entry = (mode === SurfaceMode.MODES.COLOR) ? null : getLayer(mode);
     if (!entry || !entry.layer.available) { hide(); return false; }
 
-    container.style.display = 'block';
-    for (var m in layers) layers[m].el.style.display = (m === mode) ? 'block' : 'none';
+    setDisplay(container, 'block');
+    for (var m in layers) setDisplay(layers[m].el, (m === mode) ? 'block' : 'none');
 
     var ok = entry.layer.draw({
       material: s.material,

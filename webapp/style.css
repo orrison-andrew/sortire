@@ -146,12 +146,16 @@ html, body {
   display: flex;
   flex-direction: column;
   transform: translateY(105%);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* hidden panels must not be reachable with Tab */
+  visibility: hidden;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.3s;
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 #tuning-panel.visible {
   transform: translateY(0);
+  visibility: visible;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0s;
 }
 
 .panel-header {
@@ -279,6 +283,15 @@ html, body {
   width: 100px;
   accent-color: #A370F7;
   cursor: pointer;
+}
+
+/* One-line explanation under each setting's name */
+.tune-help {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
 }
 
 .tune-val {

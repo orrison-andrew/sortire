@@ -8,6 +8,19 @@
   var audioCtx = null;
   var lastPlayTime = 0;
   var MIN_INTERVAL_MS = 50;
+  var master = null;
+  var volume = 1;
+  var enabled = true;
+
+  // Every sound goes through one master gain, so volume and mute apply to all of them
+  function dest(ctx) {
+    if (!master || master.context !== ctx) {
+      master = ctx.createGain();
+      master.connect(ctx.destination);
+    }
+    master.gain.value = volume;
+    return master;
+  }
 
   function getAudioContext() {
     if (!audioCtx) {
@@ -42,7 +55,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.08);
   }
@@ -59,7 +72,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.07);
   }
@@ -76,7 +89,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.04);
   }
@@ -93,7 +106,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.09);
   }
@@ -120,7 +133,7 @@
 
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     noise.start(t);
   }
 
@@ -135,7 +148,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.06);
   }
@@ -152,7 +165,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.09);
   }
@@ -168,7 +181,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.12);
   }
@@ -192,7 +205,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
 
     mod.start(t);
     osc.start(t);
@@ -212,7 +225,7 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(dest(ctx));
     osc.start(t);
     osc.stop(t + 0.025);
   }
@@ -231,6 +244,7 @@
   ];
 
   function playPop(styleIndex) {
+    if (!enabled) return;
     var ctx = getAudioContext();
     if (!ctx) return;
     var now = performance.now();
@@ -244,6 +258,7 @@
   }
 
   function playClick() {
+    if (!enabled) return;
     var ctx = getAudioContext();
     if (!ctx) return;
     var now = performance.now();
@@ -253,12 +268,14 @@
   }
 
   function playTick() {
+    if (!enabled) return;
     var ctx = getAudioContext();
     if (!ctx) return;
     synthPing(ctx, ctx.currentTime);
   }
 
   function playWinner() {
+    if (!enabled) return;
     var ctx = getAudioContext();
     if (!ctx) return;
     var t = ctx.currentTime;
@@ -275,7 +292,7 @@
       gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.35);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(dest(ctx));
       osc.start(noteTime);
       osc.stop(noteTime + 0.35);
     });
@@ -283,6 +300,8 @@
 
   root.SoundManager = {
     unlock: unlockAudio,
+    setEnabled: function (b) { enabled = !!b; },
+    setVolume: function (v) { volume = Math.max(0, Math.min(1, +v || 0)); },
     playPop: playPop,
     playClick: playClick,
     playTick: playTick,

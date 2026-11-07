@@ -32,6 +32,25 @@ jobs:
           test -f webapp/index.html || { echo "webapp/index.html is missing"; exit 1; }
           ls -R webapp
 
+      - name: Verify precache list
+        shell: bash
+        run: |
+          cd webapp
+          sed -n '/CORE_ASSETS = \[/,/\];/p' sw.js | grep -o "'\./[^']*'" | tr -d "'" | while read -r f; do
+            [ "$f" = "./" ] && continue
+            [ -e "$f" ] || { echo "Missing precache file: $f"; exit 1; }
+          done
+
+      - name: Stamp service worker cache version
+        shell: bash
+        run: |
+          sed -i "s|^const CACHE_NAME = .*|const CACHE_NAME = 'sortire-${GITHUB_SHA::8}';|" webapp/sw.js
+          grep -q "sortire-${GITHUB_SHA::8}" webapp/sw.js || { echo "CACHE_NAME was not stamped"; exit 1; }
+
+      # Uncomment if you keep a codec test that matches the current code format
+      # - name: Run settings codec test
+      #   run: node tools/settings-codec.test.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

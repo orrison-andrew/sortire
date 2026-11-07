@@ -6,6 +6,12 @@
 
   var SETTINGS_VERSION = '10';
 
+  // localStorage can throw (private mode, blocked storage): never let that kill the app
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
   // Dropdown labels come from the material modules so they can never drift out of order.
   function labelsFrom(mod) {
     if (mod && mod.LABELS) return mod.LABELS;
@@ -14,6 +20,7 @@
   }
   var WOOD_LABELS = labelsFrom(window.WoodGrain);
   var ROCK_LABELS = labelsFrom(window.RockTexture);
+  var SOUND_NAMES = (window.SoundManager && window.SoundManager.STYLE_NAMES) || ['Pop', 'Bubble', 'Blip', 'Laser'];
 
   // Schema defines the UI groups, sliders, and encoding bounds for the shareable format.
   var SETTINGS_SCHEMA = [
@@ -40,7 +47,8 @@
     { key: 'fx_particles', group: 'WINNER', label: 'Particle count', def: 40, min: 0, max: 150, step: 5 },
 
     { key: 'sound_enabled', group: 'AUDIO', label: 'Sound effects', def: 1, isBool: true },
-    { key: 'sound_style', group: 'AUDIO', label: 'Pop sound', def: 0, min: 0, max: 3, step: 1, options: ['Pop', 'Bubble', 'Blip', 'Laser'] },
+    { key: 'sound_volume', group: 'AUDIO', label: 'Volume', def: 1, min: 0, max: 1, step: 0.05 },
+    { key: 'sound_style', group: 'AUDIO', label: 'Pop sound', def: 0, min: 0, max: SOUND_NAMES.length - 1, step: 1, options: SOUND_NAMES },
     { key: 'haptic_tap', group: 'AUDIO', label: 'Haptic on tap', def: 1, isBool: true },
     { key: 'haptic_tick', group: 'AUDIO', label: 'Haptic on reveal', def: 1, isBool: true },
     { key: 'haptic_result', group: 'AUDIO', label: 'Haptic on final result', def: 1, isBool: true },
@@ -65,6 +73,7 @@
     { key: 'marker_radius', group: 'APPEARANCE', label: 'Marker ring size', def: 0.65, min: 0.2, max: 1.2, step: 0.05 },
     { key: 'marker_stroke', group: 'APPEARANCE', label: 'Marker thickness', def: 6, min: 0, max: 20, step: 1, unit: 'px' },
     { key: 'marker_dot', group: 'APPEARANCE', label: 'Marker dot size', def: 0.2, min: 0, max: 0.5, step: 0.05 },
+    { key: 'disc_shadow', group: 'APPEARANCE', label: 'Disc shadow', def: 0.5, min: 0, max: 1, step: 0.05 },
     { key: 'hint_enabled', group: 'APPEARANCE', label: 'Show instructions', def: 1, isBool: true },
     { key: 'hint_size', group: 'APPEARANCE', label: 'Instruction text size', def: 18, min: 10, max: 40, step: 1, unit: 'px' },
     { key: 'hint_opacity', group: 'APPEARANCE', label: 'Instruction opacity', def: 0.4, min: 0.1, max: 1.0, step: 0.05 },
@@ -77,7 +86,9 @@
     { key: 'order_revealed_scale', group: 'TIMING', label: 'Revealed item scale', def: 1.1, min: 0.5, max: 2.0, step: 0.05 },
     { key: 'order_text_scale', group: 'TIMING', label: 'Order text scale', def: 0.9, min: 0.3, max: 1.5, step: 0.05 },
     { key: 'order_pending_scale', group: 'TIMING', label: 'Unrevealed item scale', def: 0.7, min: 0.2, max: 1.0, step: 0.05 },
-    { key: 'order_pending_alpha', group: 'TIMING', label: 'Unrevealed opacity', def: 0.3, min: 0, max: 1.0, step: 0.05 }
+    { key: 'order_pending_alpha', group: 'TIMING', label: 'Unrevealed opacity', def: 0.3, min: 0, max: 1.0, step: 0.05 },
+
+    { key: 'keep_awake', group: 'SYSTEM', label: 'Keep screen on', def: 1, isBool: true }
   ];
 
   var GROUPS = {
@@ -107,14 +118,79 @@
 
   function isFlag(key) { return key === 'woodgrain_enabled' || key === 'rockgrain_enabled'; }
 
+  // One-sentence explanation shown under each setting's name
+  var HELP = {
+    wood_type: 'The wood the tabletop is made of; finger discs automatically use other woods.',
+    rock_type: 'The stone the tabletop is made of; finger discs automatically use other stones.',
+    wood_tilt: 'Moves the shine and disc shadows as you tilt your phone.',
+    wood_sheen_anim: 'Lets the shine drift slowly while fingers are down or a result is showing.',
+    wood_sheen: 'How bright the glossy highlight on the table is.',
+    wood_vignette: 'How dark the corners of the screen get.',
+    winner_bg_enabled: 'The winner\'s colour or grain stays as the table for the next round.',
+    winner_flood: 'The winner\'s colour or grain spreads across the whole screen when picked.',
+    wood_flood_ripple: 'Adds a wobbling glow to the edge of the spreading flood.',
+    flood_grain: 'Makes the flood edge run ahead on pale grain and lag on dark grain.',
+    flood_feather: 'How soft and blurry the edge of the spreading flood is.',
+    flood_ms: 'How long the flood takes to cover the screen.',
+    winner_grow: 'The winning disc swells when it is picked.',
+    winner_grow_ms: 'How long the winning disc takes to swell.',
+    winner_fade_ms: 'How long losing discs take to fade out (0 removes them instantly).',
+    fx_shockwave: 'Sends a glowing ring outward from the winner.',
+    fx_particles: 'How many sparks burst from the winner (0 for none).',
+    sound_enabled: 'Turns all sounds on or off.',
+    sound_volume: 'Master volume for every sound.',
+    sound_style: 'The sound played when a finger lands or lifts (tap \u25B6 to preview).',
+    haptic_tap: 'Short vibration when a finger lands (Android only).',
+    haptic_tick: 'Short vibration as each number is revealed (Android only).',
+    haptic_result: 'Longer vibration pattern when the final result appears (Android only).',
+    hue_step: 'How far the colour hue jumps between one finger and the next.',
+    saturation: 'How vivid the finger colours are.',
+    value_even: 'Brightness of the 1st, 3rd, 5th\u2026 finger colours.',
+    value_odd: 'Brightness of the 2nd, 4th, 6th\u2026 finger colours.',
+    random_hue: 'Picks a new random background colour each round (ignored after a win while "Winner claims background" is on).',
+    base_hue: 'The background colour to use when random background colour is off.',
+    bg_saturation: 'How colourful the background is.',
+    bg_value: 'How bright the background is.',
+    radius: 'The size of each finger disc.',
+    pulse_amount: 'How much the discs breathe in and out.',
+    pulse_speed: 'How fast the discs breathe.',
+    ring_enabled: 'Shows a ring around each finger that fills as the countdown runs.',
+    ring_offset: 'The gap between a disc and its countdown ring.',
+    ring_stroke: 'How thick the countdown ring is.',
+    ring_opacity: 'How see-through the countdown ring is.',
+    marker_enabled: 'Draws a ring and dot on the winning disc.',
+    marker_radius: 'Size of the winner marker ring relative to the disc.',
+    marker_stroke: 'Thickness of the winner marker ring.',
+    marker_dot: 'Size of the dot in the middle of the winner marker.',
+    disc_shadow: 'How dark the shadow under each disc is.',
+    hint_enabled: 'Shows the "put a finger on the screen" instructions when the screen is empty.',
+    hint_size: 'Text size of the instructions.',
+    hint_opacity: 'How faint or bold the instructions are.',
+    min_fingers: 'How many fingers must be down before the countdown starts.',
+    countdown_ms: 'How long everyone must hold still before the result.',
+    reveal_gap_ms: 'The pause between each number being revealed.',
+    order_pop_ms: 'How long a newly revealed disc takes to settle from its pop.',
+    order_pop_amount: 'How much extra a disc swells at the moment its number appears.',
+    order_revealed_scale: 'Size of discs once their number is shown.',
+    order_text_scale: 'Size of the number relative to its disc.',
+    order_pending_scale: 'Size of discs still waiting for their number.',
+    order_pending_alpha: 'How faded discs are while waiting for their number.',
+    keep_awake: 'Stops the screen from dimming or locking while the app is open.'
+  };
+
   // Which surfaces show which rows (everything else shows everywhere)
   SETTINGS_SCHEMA.forEach(function (s) {
     if (isFlag(s.key)) s.hidden = true;                       // replaced by the Surface selector
     else if (s.key === 'wood_type') s.modes = ['WOOD'];
     else if (s.key === 'rock_type') s.modes = ['STONE'];
     else if (/^(wood_tilt|wood_sheen_anim|wood_sheen|wood_vignette|wood_flood_ripple|flood_grain)$/.test(s.key)) s.modes = ['WOOD', 'STONE'];
+    else if (s.key === 'disc_shadow') s.modes = ['WOOD', 'STONE'];   // flat colour circles have no shadow
     else if (s.group === 'COLORS' || /^marker_/.test(s.key)) s.modes = ['COLOR'];
     s.perSurface = !isFlag(s.key) && !!SURFACE_GROUPS[s.group] && s.key.indexOf('hint_') !== 0;
+    s.help = HELP[s.key] || '';
+    // Rows that only matter in one game mode are hidden in the other
+    if (s.group === 'WINNER') s.game = 'FIRST';
+    else if (/^(order_|reveal_)/.test(s.key)) s.game = 'ORDER';
   });
 
   var SURFACE_KEYS = SETTINGS_SCHEMA.filter(function (s) { return s.perSurface; }).map(function (s) { return s.key; });
@@ -165,9 +241,9 @@
   function notify(key, value) { listeners.forEach(function (cb) { cb(key, value); }); }
 
   function load() {
-    var v = localStorage.getItem('sortire_settings_v');
-    var s = localStorage.getItem('sortire_settings_json');
-    var p = localStorage.getItem('sortire_profiles_json');
+    var v = store.get('sortire_settings_v');
+    var s = store.get('sortire_settings_json');
+    var p = store.get('sortire_profiles_json');
     if (v === SETTINGS_VERSION && s) {
       try {
         var parsed = JSON.parse(s);
@@ -183,11 +259,19 @@
     resetAll();
   }
 
-  function save() {
+  // Slider drags fire many changes a second, so single changes are saved after a
+  // short pause; structural changes (surface, codes, reset) are written at once.
+  var saveTimer = 0;
+  function flush() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = 0; }
     profiles[currentMode()] = pickSurface();
-    localStorage.setItem('sortire_settings_v', SETTINGS_VERSION);
-    localStorage.setItem('sortire_settings_json', JSON.stringify(state));
-    localStorage.setItem('sortire_profiles_json', JSON.stringify(profiles));
+    store.set('sortire_settings_v', SETTINGS_VERSION);
+    store.set('sortire_settings_json', JSON.stringify(state));
+    store.set('sortire_profiles_json', JSON.stringify(profiles));
+  }
+  function save(now) {
+    if (now) flush();
+    else if (!saveTimer) saveTimer = setTimeout(flush, 250);
   }
 
   // Everything back to defaults; the current surface stays selected
@@ -198,7 +282,7 @@
     SURFACES.forEach(function (m) { profiles[m] = defaultProfile(m); });
     setFlags(mode);
     applyProfile(mode);
-    save();
+    save(true);
     notify('all', null);
   }
 
@@ -209,7 +293,7 @@
     profiles[currentMode()] = pickSurface();
     setFlags(mode);
     applyProfile(mode);
-    save();
+    save(true);
     notify('all', null);
   }
 
@@ -294,7 +378,9 @@
     ['order_revealed_scale', 0.5, 2.0, 0.05],
     ['order_text_scale', 0.3, 1.5, 0.05],
     ['order_pending_scale', 0.2, 1.0, 0.05],
-    ['order_pending_alpha', 0, 1.0, 0.05]
+    ['order_pending_alpha', 0, 1.0, 0.05],
+    // Append new fields BELOW this line, never above (older codes must keep decoding)
+    ['disc_shadow', 0, 1, 0.05]
   ];
 
 
@@ -327,7 +413,11 @@
   }
 
   function decode(str) {
+    str = String(str);
+    // Letters A-Z, digits 2-7, and the spaces / dashes used for readability
+    if (/[^A-Za-z2-7\s-]/.test(str)) return { ok: false, error: 'That doesn\'t look like a settings code.' };
     str = str.replace(/[^A-Z2-7]/gi, '').toUpperCase();
+    if (str.length < 10) return { ok: false, error: 'That code looks too short or damaged.' };
     var bits = [];
     for (var i = 0; i < str.length; i++) {
       var ci = CODE_CHARS.indexOf(str[i]);
@@ -342,6 +432,7 @@
       var key = f[0], min = f[1], max = f[2], step = f[3];
       var maxSteps = Math.round((max - min) / step);
       var neededBits = Math.max(1, Math.ceil(Math.log2(maxSteps + 1)));
+      if (idx + neededBits > bits.length) break;   // field not in this (older) code: caller uses its default
 
       var v = 0;
       for (var b = 0; b < neededBits; b++) {
@@ -367,28 +458,32 @@
     var mode = modeOf(r.data);
     setFlags(mode);
     SURFACE_KEYS.forEach(function (k) {
-      if (r.data[k] !== undefined) state[k] = r.data[k];
+      state[k] = r.data[k] !== undefined ? r.data[k] : schemaDef(k);   // field missing in an older code: use its default
     });
-    save();
+    save(true);
     notify('all', null);
     return { ok: true };
   }
 
   // ── JSON backup (everything, including every surface's profile) ───────────
-  function dumpJson() { save(); return JSON.stringify({ state: state, profiles: profiles }, null, 2); }
+  function dumpJson() { flush(); return JSON.stringify({ state: state, profiles: profiles }, null, 2); }
   function importJson(txt) {
     try {
       var parsed = JSON.parse(txt);
       var st = parsed.state || parsed;               // also accepts the old flat format
       SETTINGS_SCHEMA.forEach(function (s) {
-        if (st[s.key] !== undefined) state[s.key] = st[s.key];
+        var v = Number(st[s.key]);
+        if (st[s.key] === undefined || !isFinite(v)) return;
+        if (s.min !== undefined) v = Math.max(s.min, Math.min(s.max, v));
+        else if (s.isBool) v = v ? 1 : 0;
+        state[s.key] = v;
       });
       if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
       if (parsed.profiles) {
         SURFACES.forEach(function (m) { if (parsed.profiles[m]) profiles[m] = parsed.profiles[m]; });
         applyProfile(currentMode());
       }
-      save();
+      save(true);
       notify('all', null);
       return true;
     } catch (e) { return false; }
@@ -397,10 +492,10 @@
   // ── Saved tunings (each belongs to one surface) ───────────────────────────
   function allSaved() {
     try {
-      return JSON.parse(localStorage.getItem('sortire_saved_tunings')) || [];
+      return JSON.parse(store.get('sortire_saved_tunings')) || [];
     } catch (e) { return []; }
   }
-  function writeSaved(l) { localStorage.setItem('sortire_saved_tunings', JSON.stringify(l)); }
+  function writeSaved(l) { store.set('sortire_saved_tunings', JSON.stringify(l)); }
 
   function listSaved(mode) {
     return allSaved().map(function (x) {
@@ -428,6 +523,11 @@
 
   load();
 
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flush();
+  });
+
   window.Settings = {
     SCHEMA: SETTINGS_SCHEMA,
     GROUPS: GROUPS,
@@ -450,6 +550,7 @@
     saveCode: saveCode,
     deleteSaved: deleteSaved,
     renameSaved: renameSaved,
+    flush: flush,
     addChangeListener: function (cb) { listeners.push(cb); }
   };
 })();

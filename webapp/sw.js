@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sortire-pwa-v18';
+const CACHE_NAME = 'sortire-pwa-v19';
 
 const CORE_ASSETS = [
   './',
@@ -28,27 +28,24 @@ const OPTIONAL_ASSETS = [
   './icons/icon.svg'
 ];
 
+// Precache bypasses the browser HTTP cache ('reload'), so a new version can never
+// be built from stale copies of its files. There is no skipWaiting() here: the
+// "Update" button in the app sends SKIP_WAITING when the person is ready.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(CORE_ASSETS).then(() =>
-        Promise.all(OPTIONAL_ASSETS.map((url) => cache.add(url).catch(() => {})))
-      );
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(CORE_ASSETS.map((u) => new Request(u, { cache: 'reload' })));
+      await Promise.all(OPTIONAL_ASSETS.map((u) =>
+        cache.add(new Request(u, { cache: 'reload' })).catch(() => {})));
+    })
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -58,30 +55,22 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Cache-first from this version's own cache. Files are never rewritten in place
+// (that could mix new and old files); only codes.txt refreshes in the background.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const req = event.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse);
-            });
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      });
-    })
-  );
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const hit = await cache.match(req, { ignoreSearch: true });
+
+    if (req.url.split('?')[0].endsWith('/codes.txt')) {
+      const net = fetch(req, { cache: 'no-cache' })
+        .then((r) => { if (r && r.ok) cache.put(req, r.clone()); return r; })
+        .catch(() => hit);
+      return hit || net;
+    }
+    return hit || fetch(req);
+  })());
 });

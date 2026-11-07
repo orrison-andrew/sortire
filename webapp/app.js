@@ -20,7 +20,13 @@
 
   var SURFACE_LABELS = { COLOR: 'Color', WOOD: 'Wood', STONE: 'Stone' };
 
-  var currentMode = localStorage.getItem('sortire_mode') === 'ORDER' ? MODES.ORDER : MODES.FIRST;
+  // localStorage can throw (private mode, blocked storage), so every use goes through here
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  var currentMode = store.get('sortire_mode') === 'ORDER' ? MODES.ORDER : MODES.FIRST;
 
   function hsvToRgb(h, s, v) {
     h = (h % 360 + 360) % 360;
@@ -95,22 +101,34 @@
 
   var bgSeed = Math.floor(Math.random() * 100000) + 1;
 
+  // Forget the previous winner's table, so the chosen material is what shows
+  function clearWinnerTable() {
+    lastWinnerWood = lastWinnerRock = lastWinnerColor = null;
+    lastWinnerSeed = 0;
+  }
+
   function Palette() {
+    this.baseHue = Math.random() * 360;   // first finger hue
+    this.bgHue = Math.random() * 360;     // random background hue, fixed for the round
+    this.refresh();
+  }
+
+  // Re-read the colour settings, so their sliders take effect immediately
+  Palette.prototype.refresh = function () {
     this.hueStep = Settings.get('hue_step');
     this.saturation = Settings.get('saturation');
     this.valueEven = Settings.get('value_even');
     this.valueOdd = Settings.get('value_odd');
-    this.baseHue = Math.random() * 360;
 
     if (Settings.bool('winner_bg_enabled') && lastWinnerColor) {
       var hsv = rgbToHsv(lastWinnerColor.r, lastWinnerColor.g, lastWinnerColor.b);
       var mutedSat = Math.min(Settings.get('bg_saturation'), hsv.s * 0.65);
       this.background = hsvToRgb(hsv.h, mutedSat, Settings.get('bg_value'));
     } else {
-      var bgHue = Settings.bool('random_hue') ? Math.random() * 360 : Settings.get('base_hue');
+      var bgHue = Settings.bool('random_hue') ? this.bgHue : Settings.get('base_hue');
       this.background = hsvToRgb(bgHue % 360, Settings.get('bg_saturation'), Settings.get('bg_value'));
     }
-  }
+  };
 
   Palette.prototype.color = function (index) {
     var hue = (this.baseHue + index * this.hueStep) % 360;
@@ -174,10 +192,32 @@
     } catch (e) {}
   }
 
+  // Halfway through the countdown the winner and their grain are chosen and the grain
+  // is generated, so the flood starts without a hitch. Any finger change restarts the
+  // countdown and throws the pick away, so it is exactly as fair as picking at the end.
+  var warmTimer = 0;
+  var pendingWinner = null;
+  var pendingSeed = 0;
+
   function restartCountdown() {
     var minF = Math.round(Settings.get('min_fingers'));
     phase = (fingerIds.length >= minF) ? 'COUNTING' : 'WAITING';
     countdownStart = performance.now();
+
+    clearTimeout(warmTimer);
+    pendingWinner = null;
+    pendingSeed = 0;
+    if (phase === 'COUNTING' && currentMode === MODES.FIRST && Settings.bool('winner_flood')) {
+      warmTimer = setTimeout(function () {
+        if (phase !== 'COUNTING' || !fingerIds.length) return;
+        pendingWinner = fingerIds[Math.floor(Math.random() * fingerIds.length)];
+        pendingSeed = Math.floor(Math.random() * 100000) + 1;
+        var f = fingers[pendingWinner];
+        var mode = SurfaceMode.getActiveMode();
+        var set = surfaceSet(mode);
+        if (f && set) set.master(mode === SurfaceMode.MODES.STONE ? f.discRockType : f.discSpecies, pendingSeed);
+      }, Settings.get('countdown_ms') * 0.5);
+    }
     requestDraw();
   }
 
@@ -315,6 +355,9 @@
       bgSeed = Math.floor(Math.random() * 100000) + 1;
     }
 
+    clearTimeout(warmTimer);
+    pendingWinner = null;
+    pendingSeed = 0;
     if (fx) fx.stop();
     requestDraw();
   }
@@ -325,7 +368,10 @@
     var ids = fingerIds.slice();
 
     if (currentMode === MODES.FIRST) {
-      winnerId = ids[Math.floor(Math.random() * ids.length)];
+      winnerId = (pendingWinner && fingers[pendingWinner]) ? pendingWinner : ids[Math.floor(Math.random() * ids.length)];
+      var floodSeed = pendingSeed || (Math.floor(Math.random() * 100000) + 1);
+      pendingWinner = null;
+      pendingSeed = 0;
       var growMs = winnerGrowMs();
       var floodMs = Settings.get('flood_ms');
       animationEnd = now + Math.max(growMs, floodMs, 1200);
@@ -337,7 +383,7 @@
         floodGrain = {
           species: w.discSpecies,
           rockType: w.discRockType,
-          seed: Math.floor(Math.random() * 100000) + 1
+          seed: floodSeed
         };
         lastWinnerColor = w.color;
         lastWinnerWood  = floodGrain.species;
@@ -424,6 +470,7 @@
     if (Settings.bool('sound_enabled')) SoundManager.playPop(style);
     haptic('tap');
     restartCountdown();
+    syncWakeLock();
   }
 
   function liftFinger(id) {
@@ -475,6 +522,7 @@
 
   function onTouchEnd(e) {
     e.preventDefault();
+    SoundManager.unlock();   // iOS only unlocks audio on touchend
     for (var i = 0; i < e.changedTouches.length; i++) {
       var t = e.changedTouches[i];
       liftFinger(t.identifier);
@@ -495,6 +543,10 @@
 
   function onMouseDown(e) {
     if (e.target.closest('#tune-btn') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal') || e.target.closest('#update-toast')) return;
+    // Shift-click "pins" never lift, so release them once a result is showing
+    if (phase === 'RESULT') {
+      for (var pk in fingers) if (pk.indexOf('pin_') === 0) fingers[pk].down = false;
+    }
     var rect = canvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
@@ -533,21 +585,44 @@
     requestDraw();
   }
 
+  var SHADOW_BLUR = 0.2;   // blur as a fraction of the disc diameter
+
+  // The puck's silhouette, blurred, on a padded transparent canvas (cached on the puck)
+  function shadowSprite(src) {
+    if (src.shadowCv) return src.shadowCv;
+    var S = src.width;
+    var blur = SHADOW_BLUR * S / (src.drawScale || 1);
+    var pad = Math.ceil(blur * 2);
+    var OFF = 10000;
+    var c = document.createElement('canvas');
+    c.width = c.height = S + pad * 2;
+    var x = c.getContext('2d');
+    // Drawn far off-canvas; only its shadow lands on the canvas
+    x.shadowColor = 'rgba(0,0,0,1)';
+    x.shadowBlur = blur;
+    x.shadowOffsetX = OFF;
+    x.drawImage(src, pad - OFF, pad);
+    c.pad = pad;
+    src.shadowCv = c;
+    return c;
+  }
+
   function drawCircle(fg, x, y, r, color, alpha) {
     if (r <= 0) return;
     alpha = (alpha === undefined) ? 1 : Math.max(0, Math.min(1, alpha));
     if (fg && fg.puckCanvas) {
-      var SHADOW_OFF = 10000;
       var L = lightVec();
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,' + (0.50 * alpha) + ')';
-      ctx.shadowBlur = r * 0.40 * dpr;
-      ctx.shadowOffsetX = (SHADOW_OFF - L.x * r * 0.17) * dpr;
-      ctx.shadowOffsetY = (-L.y * r * 0.17) * dpr;
-      // Drawn far off-screen; only its shadow lands on-screen, shaped like the puck
       var pr = r * (fg.puckCanvas.drawScale || 1);
-      ctx.drawImage(fg.puckCanvas, x - pr - SHADOW_OFF, y - pr, pr * 2, pr * 2);
-      ctx.restore();
+      var strength = Settings.get('disc_shadow');
+      if (strength > 0) {
+        // Pre-blurred shadow sprite (made once per puck): scaling it is far cheaper than blurring every frame
+        var sp = shadowSprite(fg.puckCanvas);
+        var k = (pr * 2) / fg.puckCanvas.width;
+        ctx.save();
+        ctx.globalAlpha = alpha * strength;
+        ctx.drawImage(sp, x - pr - L.x * r * 0.17 - sp.pad * k, y - pr - L.y * r * 0.17 - sp.pad * k, sp.width * k, sp.height * k);
+        ctx.restore();
+      }
 
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -840,14 +915,59 @@
     SurfaceMode.setActiveMode(surface);
     reset();
     buildTuningPanel();
+    warmAtlases();
   }
 
   function selectMode(mode) {
     if (currentMode === mode) return;
     currentMode = mode;
-    localStorage.setItem('sortire_mode', mode.id);
+    store.set('sortire_mode', mode.id);
     reset();
     buildTuningPanel();
+  }
+
+  function syncSound() {
+    SoundManager.setEnabled(Settings.bool('sound_enabled'));
+    SoundManager.setVolume(Settings.get('sound_volume'));
+  }
+
+  // Keep the screen on while the app is open (it usually sits on a table)
+  var wakeLock = null;
+  var wakePending = false;
+  function syncWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    var want = Settings.bool('keep_awake') && document.visibilityState === 'visible';
+    if (want && !wakeLock && !wakePending) {
+      wakePending = true;
+      navigator.wakeLock.request('screen').then(function (l) {
+        wakePending = false;
+        wakeLock = l;
+        l.addEventListener('release', function () { wakeLock = null; });
+        syncWakeLock();   // the setting may have changed while the request was in flight
+      }).catch(function () { wakePending = false; });
+    } else if (!want && wakeLock) {
+      try { wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+    }
+  }
+
+  function whenIdle(fn) {
+    if (window.requestIdleCallback) window.requestIdleCallback(fn, { timeout: 3000 });
+    else setTimeout(fn, 250);
+  }
+
+  // Generate the disc textures of the active surface in idle time, one per slice,
+  // so the first touch of each material doesn't wait for the GPU
+  function warmAtlases() {
+    var set = surfaceSet(SurfaceMode.getActiveMode());
+    if (!set || !set.warm) return;
+    var keys = set.KEYS.slice();
+    var i = 0;
+    (function step() {
+      if (i >= keys.length) return;
+      set.warm(keys[i++]);
+      whenIdle(step);
+    })();
   }
 
   var communityCodes = [];
@@ -892,6 +1012,7 @@
   function applyCodeAndRefresh(code) {
     var r = Settings.applyCode(code);
     if (!r.ok) { alert(r.error); return false; }
+    clearWinnerTable();
     buildTuningPanel();
     reset();
     return true;
@@ -1091,7 +1212,8 @@
 
     groupOrder.forEach(function (groupKey) {
       var groupItems = Settings.SCHEMA.filter(function (s) {
-        return s.group === groupKey && !s.hidden && (!s.modes || s.modes.indexOf(surface) >= 0);
+        return s.group === groupKey && !s.hidden && (!s.modes || s.modes.indexOf(surface) >= 0) &&
+               (!s.game || s.game === currentMode.id);
       });
       if (groupItems.length === 0 && groupKey !== 'SYSTEM') return;
 
@@ -1110,6 +1232,12 @@
         var label = document.createElement('div');
         label.className = 'tune-label';
         label.textContent = s.label;
+        if (s.help) {
+          var help = document.createElement('div');
+          help.className = 'tune-help';
+          help.textContent = s.help;
+          label.appendChild(help);
+        }
 
         var control = document.createElement('div');
         control.className = 'tune-control';
@@ -1129,6 +1257,7 @@
             if (s.key === 'sound_style') {
               SoundManager.playPop(idx);
             }
+            if (s.key === 'wood_type' || s.key === 'rock_type') clearWinnerTable();
             if (s.key === 'wood_type' || s.key === 'rock_type' || s.resetsRound) reset(); else requestDraw();
           });
           control.appendChild(select);
@@ -1286,6 +1415,7 @@
       resetBtn.addEventListener('click', function () {
         SoundManager.playClick();
         Settings.resetAll();
+        clearWinnerTable();
         buildTuningPanel();
         reset();
       });
@@ -1294,26 +1424,14 @@
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
         SoundManager.playClick();
-        var dumpText = Settings.dump();
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(dumpText).then(function () {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
-          });
-        }
+        copyText(Settings.dump(), copyBtn, 'Copy');
       });
     }
 
     if (copyJsonBtn) {
       copyJsonBtn.addEventListener('click', function () {
         SoundManager.playClick();
-        var jsonText = Settings.dumpJson();
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(jsonText).then(function () {
-            copyJsonBtn.textContent = 'Copied!';
-            setTimeout(function () { copyJsonBtn.textContent = 'JSON'; }, 1500);
-          });
-        }
+        copyText(Settings.dumpJson(), copyJsonBtn, 'JSON');
       });
     }
 
@@ -1348,6 +1466,7 @@
         }
         if (ok) {
           importModal.classList.remove('visible');
+          clearWinnerTable();
           buildTuningPanel();
           reset();
         } else {
@@ -1356,7 +1475,17 @@
       });
     }
 
-    Settings.addChangeListener(function () { requestDraw(); updateCodeBox(); });
+    syncSound();
+    syncWakeLock();
+    Settings.addChangeListener(function (key) {
+      if (key === 'all' || /^(hue_step|saturation|value_even|value_odd|random_hue|base_hue|bg_saturation|bg_value)$/.test(key)) palette.refresh();
+      if (key === 'all' || key === 'sound_enabled' || key === 'sound_volume') syncSound();
+      if (key === 'all' || key === 'keep_awake') syncWakeLock();
+      requestDraw();
+      updateCodeBox();
+    });
+    document.addEventListener('visibilitychange', syncWakeLock);
+    whenIdle(warmAtlases);
     loadCommunityCodes();
     setupServiceWorker();
     requestDraw();
@@ -1407,7 +1536,7 @@
       });
     }
 
-    window.addEventListener('load', function () {
+    function register() {
       navigator.serviceWorker.register('./sw.js').then(function (reg) {
         swRegistration = reg;
         console.log('Sortire Service Worker registered:', reg.scope);
@@ -1434,7 +1563,9 @@
       }).catch(function (err) {
         console.error('Sortire Service Worker registration failed:', err);
       });
-    });
+    }
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register);
 
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && swRegistration) {
@@ -1442,12 +1573,15 @@
       }
     });
 
+    // Reload only when an already-running copy is replaced (the person tapped Update).
+    // The very first install also fires controllerchange; that must not reload.
+    var hadController = !!navigator.serviceWorker.controller;
     var refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
+      if (!hadController) { hadController = true; return; }
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
     });
   }
 
