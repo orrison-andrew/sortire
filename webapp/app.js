@@ -28,6 +28,21 @@
 
   var currentMode = store.get('sortire_mode') === 'ORDER' ? MODES.ORDER : MODES.FIRST;
 
+  // Unbiased random integer 0..n-1 from the browser's cryptographic generator.
+  // Used for everything that decides a result (winner, order), so it cannot be
+  // predicted or nudged, and it depends on nothing but n.
+  function randInt(n) {
+    if (n <= 1) return 0;
+    var c = window.crypto || window.msCrypto;
+    if (c && c.getRandomValues) {
+      var buf = new Uint32Array(1);
+      var limit = Math.floor(4294967296 / n) * n;   // reject the biased tail
+      do { c.getRandomValues(buf); } while (buf[0] >= limit);
+      return buf[0] % n;
+    }
+    return Math.floor(Math.random() * n);
+  }
+
   function hsvToRgb(h, s, v) {
     h = (h % 360 + 360) % 360;
     var c = v * s;
@@ -254,7 +269,7 @@
     if (phase === 'COUNTING' && currentMode === MODES.FIRST && Settings.bool('winner_flood')) {
       warmTimer = setTimeout(function () {
         if (phase !== 'COUNTING' || !fingerIds.length) return;
-        pendingWinner = fingerIds[Math.floor(Math.random() * fingerIds.length)];
+        pendingWinner = fingerIds[randInt(fingerIds.length)];
         pendingSeed = Math.floor(Math.random() * 100000) + 1;
         var f = fingers[pendingWinner];
         var mode = SurfaceMode.getActiveMode();
@@ -411,7 +426,7 @@
     var ids = fingerIds.slice();
 
     if (currentMode === MODES.FIRST) {
-      winnerId = (pendingWinner && fingers[pendingWinner]) ? pendingWinner : ids[Math.floor(Math.random() * ids.length)];
+      winnerId = (pendingWinner && fingers[pendingWinner]) ? pendingWinner : ids[randInt(ids.length)];
       var floodSeed = pendingSeed || (Math.floor(Math.random() * 100000) + 1);
       pendingWinner = null;
       pendingSeed = 0;
@@ -440,7 +455,7 @@
       haptic('result');
     } else {
       for (var i = ids.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
+        var j = randInt(i + 1);
         var temp = ids[i]; ids[i] = ids[j]; ids[j] = temp;
       }
       ranking = ids;
@@ -497,14 +512,15 @@
       var f = fingers[id];
       if (f && f[field] === key) used.push(f.shadeShift);
     });
-    var best = 0, bestGap = -1;
-    for (var n = 0; n < 12; n++) {
-      var c = (Math.random() * 2 - 1) * SHADE_RANGE;
-      var gap = Infinity;
-      for (var u = 0; u < used.length; u++) gap = Math.min(gap, Math.abs(used[u] - c));
-      if (gap > bestGap) { bestGap = gap; best = c; }
+    if (!used.length) return (Math.random() * 2 - 1) * SHADE_RANGE;
+    // Put the new shade in the middle of the widest gap between the shades already used
+    var pts = used.concat([-SHADE_RANGE, SHADE_RANGE]).sort(function (p, q) { return p - q; });
+    var bestGap = -1, mid = 0;
+    for (var i = 0; i < pts.length - 1; i++) {
+      var gap = pts[i + 1] - pts[i];
+      if (gap > bestGap) { bestGap = gap; mid = (pts[i] + pts[i + 1]) / 2; }
     }
-    return best;
+    return mid + (Math.random() - 0.5) * bestGap * 0.2;
   }
 
   function addFinger(id, x, y) {
@@ -524,7 +540,10 @@
     var surfMode = SurfaceMode.getActiveMode();
     var shadeShift = pickShade(surfMode === SurfaceMode.MODES.STONE ? 'discRockType' : 'discSpecies',
                                surfMode === SurfaceMode.MODES.STONE ? discRock : discWood);
-    var seed = Math.floor(Math.random() * 100000);
+    var seed;
+    do {   // every disc gets a seed no other disc on screen has, so no two grains match
+      seed = Math.floor(Math.random() * 100000);
+    } while (fingerIds.some(function (fid) { return fingers[fid] && fingers[fid].seed === seed; }));
     var inUse = fingerIds.map(function (fid) { return fingers[fid].color; });
     var color = palette.pick(inUse);
 

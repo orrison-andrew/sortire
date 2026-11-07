@@ -10,17 +10,6 @@ That link works right now, in your browser. There is nothing to download, no acc
 
 ---
 
-## What is a PWA?
-
-Sortire is a **PWA** (progressive web app). That just means it is a website that can behave like an app:
-
-- **No app store.** Open a link and it works.
-- **Installs in seconds.** Add it to your home screen and it gets its own icon and opens full screen.
-- **Works offline.** After the first time you open it, it keeps working without internet.
-- **Updates itself.** When there's a new version, a small "Update" button appears.
-- **Tiny and private.** No account, no ads, no tracking. Your settings are stored only on your device.
-
----
 
 ## Add it to your home screen (recommended)
 
@@ -48,8 +37,19 @@ Use **Chrome** (or Samsung Internet).
 You can skip installing and just keep using the link in your browser.
 
 ---
+## What is a PWA?
 
-## How to play
+Sortire is a **PWA** (progressive web app). That just means it is a website that can behave like an app:
+
+- **No app store.** Open a link and it works.
+- **Installs in seconds.** Add it to your home screen and it gets its own icon and opens full screen.
+- **Works offline.** After the first time you open it, it keeps working without internet.
+- **Updates itself.** When there's a new version, a small "Update" button appears.
+- **Tiny and private.** No account, no ads, no tracking. Your settings are stored only on your device.
+
+---
+
+## How to Use
 
 1. Open Sortire. Pick a mode in the settings (the ⚙ button, top right):
    - **Pick one:** one finger is chosen as the winner.
@@ -64,7 +64,10 @@ No touchscreen? On a computer, click to place a finger. Hold **Shift** while cli
 Tap **⚙** to open the settings, and tap it again (or **Done**) to close them. At the top are **Game Mode** (**Pick one** or **Order all**) and **Surface**: **Color** (flat colored circles), **Wood** or **Stone**. Right under them are **Import** (paste a settings code), **Copy** (copy the current settings code) and **Reset**. Each surface keeps its own settings (materials, lighting, winner effects, colors, finger look), so changing one never disturbs the others; sound, timing and instruction text are shared. Rows that don't apply to a surface are hidden (for example the winner marker ring is Color only). Wood and stone give the textured-disc look and lets you pick the wood, shine, tilt lighting and winner effects. When someone wins, their wood spreads over the table in a fresh grain of its own, and that grain stays as the table for the next round. **Flood duration**, **Flood edge softness**, **Flood ripple intensity** and **Flood shows underlying grain** shape how it spreads, and **Winner grows** only controls the winning disc. **Disc shadow** sets how dark the shadow under each wood or stone disc is. Other sections cover the countdown length, **Volume** and sounds, vibration, and **Keep screen on** (stops the screen from dimming while the app is open). Every setting has a one-line explanation under its name, and settings that only matter in one game mode (winner effects for **Pick one**, reveal timing for **Order all**) are hidden in the other. **Reset** puts everything back to the defaults.
 
 ### No two fingers look alike
-On **Color**, fingers draw from a palette of 100 colors (pale, vivid, deep and muted tones all mixed), and each new finger gets the color that is furthest from every color already on screen. **Color variety**, **Color saturation** and **Color brightness** shape the palette. On **Wood** and **Stone**, each finger gets a different material where possible, and every disc has its own freshly generated grain (nothing is stored or reused). Discs of the same material are also made slightly lighter or darker than each other.
+On **Color**, fingers draw from a palette of 100 colors (pale, vivid, deep and muted tones all mixed), and each new finger gets the color that is furthest from every color already on screen. **Color variety**, **Color saturation** and **Color brightness** shape the palette. On **Wood** and **Stone**, each finger gets a different material where possible, and every disc has its own freshly generated grain (nothing is stored or reused). Discs of the same material are also made slightly lighter or darker than each other, spaced as far apart as possible.
+
+### Fair results
+The winner (or the order) is picked with the browser's cryptographic random generator, using nothing but the number of fingers down: not their position, color, material or the order they touched. The pick is made halfway through the countdown, and any finger added or lifted restarts the countdown and throws that pick away, so the result is always a fresh, equal-chance draw among the fingers that are down at the end.
 
 ### Share and save your tunings
 Each surface's tuning is captured in one **settings code**, a short string of letters and numbers shown at the top of the settings panel (under **Share & Saved Tunings**).
