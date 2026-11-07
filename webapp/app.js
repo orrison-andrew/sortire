@@ -626,7 +626,7 @@
   var pinnedMouseCount = 0;
 
   function onMouseDown(e) {
-    if (e.target.closest('#tune-btn') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal') || e.target.closest('#update-toast')) return;
+    if (e.target.closest('#tune-btn') || e.target.closest('#install-modal') || e.target.closest('#tuning-panel') || e.target.closest('#import-modal') || e.target.closest('#update-toast')) return;
     // Shift-click "pins" never lift, so release them once a result is showing
     if (phase === 'RESULT') {
       for (var pk in fingers) if (pk.indexOf('pin_') === 0) fingers[pk].down = false;
@@ -755,6 +755,53 @@
     }
   }
 
+  // The person's winning message, on the half of the screen away from the winner
+  function drawWinMessage(w, elapsed) {
+    var msg = Personal.getMessage();
+    if (!msg.on || !msg.text) return;
+    var t = Math.min(1, Math.max(0, (elapsed - 0.25) / 0.4));   // fades in just after the winner is picked
+    if (t <= 0) return;
+
+    var W = window.innerWidth, H = window.innerHeight;
+    var maxW = W * 0.86;
+    var size = Math.round(Math.max(24, Math.min(64, W * 0.1)));
+    var lines;
+    ctx.save();
+    for (;;) {
+      ctx.font = 'bold ' + size + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      var words = msg.text.split(/\s+/), cur = '';
+      lines = [];
+      words.forEach(function (word) {
+        var test = cur ? cur + ' ' + word : word;
+        if (cur && ctx.measureText(test).width > maxW) { lines.push(cur); cur = word; }
+        else cur = test;
+      });
+      if (cur) lines.push(cur);
+      var widest = 0;
+      lines.forEach(function (l) { widest = Math.max(widest, ctx.measureText(l).width); });
+      if (widest <= maxW || size <= 16) break;
+      size -= 2;
+    }
+
+    var lineH = size * 1.2;
+    var cy = (w.y > H / 2) ? H * 0.22 : H * 0.78;
+    ctx.globalAlpha = t;
+    ctx.translate(W / 2, cy);
+    ctx.scale(0.92 + 0.08 * t, 0.92 + 0.08 * t);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(4, size * 0.14);
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillStyle = '#FFFFFF';
+    var y0 = -(lines.length - 1) * lineH / 2;
+    lines.forEach(function (l, i) {
+      ctx.strokeText(l, 0, y0 + i * lineH);
+      ctx.fillText(l, 0, y0 + i * lineH);
+    });
+    ctx.restore();
+  }
+
   function drawWinner(now) {
     var baseRadius = Settings.get('radius');
     var fadeS = Settings.get('winner_fade_ms') / 1000;
@@ -778,6 +825,7 @@
     var grow = 1 - Math.pow(1 - t, 3);
     var radius = baseRadius * winnerScale(grow);
     drawCircle(w, w.x, w.y, radius, w.color, 1);
+    drawWinMessage(w, e);
 
     if (Settings.bool('marker_enabled') && SurfaceMode.getActiveMode() === SurfaceMode.MODES.COLOR) {
       var markerColor = getAdaptiveMarkerColor(w.color);
@@ -997,6 +1045,7 @@
   function selectSurface(surface) {
     if (SurfaceMode.getActiveMode() === surface) return;
     SurfaceMode.setActiveMode(surface);
+    clearWinnerTable();   // show the new surface's own material, not the last winner's
     reset();
     buildTuningPanel();
     warmAtlases();
@@ -1033,6 +1082,98 @@
       try { wakeLock.release(); } catch (e) {}
       wakeLock = null;
     }
+  }
+
+  // ── Install help (phones, in a browser only; opened from the Settings panel) ──
+  var deferredInstall = null;   // Chrome's install prompt, when it offers one
+  var installUI = { available: function () { return false; }, open: function () {} };
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredInstall = e;
+    var now = document.getElementById('install-now');
+    var modal = document.getElementById('install-modal');
+    if (now && modal && modal.classList.contains('visible')) now.hidden = false;
+  });
+
+  function setupInstall() {
+    var modal = document.getElementById('install-modal');
+    var body = document.getElementById('install-body');
+    var now = document.getElementById('install-now');
+    var close = document.getElementById('install-close');
+    if (!modal || !body) return;
+
+    var ua = navigator.userAgent || '';
+    var isIOS = /iPhone|iPod/.test(ua);
+    var isAndroid = /Android/.test(ua) && /Mobile/.test(ua);
+    // iPhone browsers other than Safari (and in-app browsers) can't install web apps
+    var iosSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|GSA|Line\//.test(ua);
+
+    function installed() {
+      try {
+        if (navigator.standalone) return true;
+        return ['standalone', 'fullscreen', 'minimal-ui'].some(function (m) {
+          return window.matchMedia('(display-mode: ' + m + ')').matches;
+        });
+      } catch (e) { return false; }
+    }
+
+    function para(text) {
+      var p = document.createElement('p');
+      p.textContent = text;
+      body.appendChild(p);
+    }
+    function steps(list) {
+      var ol = document.createElement('ol');
+      list.forEach(function (t) {
+        var li = document.createElement('li');
+        li.textContent = t;
+        ol.appendChild(li);
+      });
+      body.appendChild(ol);
+    }
+
+    function fillHelp() {
+      body.innerHTML = '';
+      para('Install Sortire to open it full screen, with its own icon. It keeps working offline, and there is nothing to download from an app store.');
+      if (isIOS) {
+        if (!iosSafari) para('Open this page in Safari first: other iPhone browsers can\u2019t add web apps to the home screen.');
+        steps([
+          'Tap the Share button (the square with an arrow pointing up) in Safari\u2019s toolbar.',
+          'Scroll down and tap \u201CAdd to Home Screen\u201D.',
+          'Tap \u201CAdd\u201D.'
+        ]);
+      } else if (deferredInstall) {
+        para('Tap \u201CInstall\u201D below.');
+      } else {
+        steps([
+          'Open this page in Chrome (or Samsung Internet).',
+          'Tap the \u22EE menu at the top right.',
+          'Tap \u201CInstall app\u201D (or \u201CAdd to Home screen\u201D).',
+          'Tap \u201CInstall\u201D.'
+        ]);
+      }
+      if (now) now.hidden = !deferredInstall;
+    }
+
+    function closeModal() { modal.classList.remove('visible'); }
+
+    if (close) close.addEventListener('click', function () { SoundManager.playClick(); closeModal(); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    if (now) {
+      now.addEventListener('click', function () {
+        SoundManager.playClick();
+        if (!deferredInstall) return;
+        var p = deferredInstall;
+        deferredInstall = null;
+        closeModal();
+        try { p.prompt(); } catch (err) {}
+      });
+    }
+    window.addEventListener('appinstalled', closeModal);
+
+    installUI.available = function () { return (isIOS || isAndroid) && !installed(); };
+    installUI.open = function () { fillHelp(); modal.classList.add('visible'); };
   }
 
   function whenIdle(fn) {
@@ -1398,6 +1539,32 @@
       });
 
       if (groupKey === 'SYSTEM') {
+        if (installUI.available()) {
+          var instRow = document.createElement('div');
+          instRow.className = 'tune-row';
+          var instLabel = document.createElement('div');
+          instLabel.className = 'tune-label';
+          instLabel.textContent = 'Install app';
+          var instHelp = document.createElement('div');
+          instHelp.className = 'tune-help';
+          instHelp.textContent = 'Add Sortire to your home screen to use it full screen, like any other app.';
+          instLabel.appendChild(instHelp);
+          var instCtrl = document.createElement('div');
+          instCtrl.className = 'tune-control';
+          var instBtn = document.createElement('button');
+          instBtn.className = 'panel-btn';
+          instBtn.type = 'button';
+          instBtn.textContent = 'How to install';
+          instBtn.addEventListener('click', function () {
+            SoundManager.playClick();
+            installUI.open();
+          });
+          instCtrl.appendChild(instBtn);
+          instRow.appendChild(instLabel);
+          instRow.appendChild(instCtrl);
+          groupEl.appendChild(instRow);
+        }
+
         var updateRow = document.createElement('div');
         updateRow.className = 'tune-row';
         var updateLabel = document.createElement('div');
@@ -1425,6 +1592,133 @@
 
       content.appendChild(groupEl);
     });
+
+    buildPersonalSection(content);
+  }
+
+  // "My winner sound & message": kept on this device, outside Settings (see personal.js)
+  var personalUI = null;   // re-renders the sound row of the panel currently on screen
+
+  function buildPersonalSection(content) {
+    var title = document.createElement('div');
+    title.className = 'panel-group-title';
+    title.textContent = 'My winner sound & message';
+    content.appendChild(title);
+
+    var box = document.createElement('div');
+    box.className = 'panel-group';
+
+    var note = document.createElement('div');
+    note.className = 'tune-help';
+    note.style.padding = '10px 0 2px';
+    note.textContent = 'Saved on this device only. Not part of settings codes, and Reset leaves it alone.';
+    box.appendChild(note);
+
+    // Winning sound
+    var sRow = document.createElement('div');
+    sRow.className = 'tune-row stack';
+    var sLabel = document.createElement('div');
+    sLabel.className = 'tune-label';
+    sLabel.textContent = 'Winning sound';
+    var sHelp = document.createElement('div');
+    sHelp.className = 'tune-help';
+    sHelp.textContent = Personal.canRecord()
+      ? 'Record up to ' + Personal.MAX_SECONDS + ' seconds to play instead of the default chime when someone wins.'
+      : 'Recording isn\u2019t supported in this browser, so the default chime is used.';
+    sLabel.appendChild(sHelp);
+    var sCtrl = document.createElement('div');
+    sCtrl.className = 'tune-control';
+    sRow.appendChild(sLabel);
+    sRow.appendChild(sCtrl);
+
+    function soundBtn(label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'panel-btn';
+      b.textContent = label;
+      b.addEventListener('click', function () { SoundManager.playClick(); fn(); });
+      sCtrl.appendChild(b);
+      return b;
+    }
+
+    function renderSound(text) {
+      sCtrl.innerHTML = '';
+      var recording = Personal.isRecording();
+      var status = document.createElement('span');
+      status.className = 'tune-val';
+      status.style.textAlign = 'left';
+      status.style.flex = '1';
+      status.textContent = text || (recording ? 'Recording\u2026 tap Stop' : (Personal.hasSound() ? 'Your recording' : 'Default chime'));
+      sCtrl.appendChild(status);
+
+      if (Personal.canRecord()) {
+        var recBtn = soundBtn(recording ? 'Stop' : (Personal.hasSound() ? 'Re-record' : 'Record'), function () {
+          if (Personal.isRecording()) { Personal.stopRecording(); return; }
+          Personal.startRecording(function (state, msg) {
+            if (personalUI) personalUI(state === 'error' ? msg : null);
+          });
+        });
+        if (recording) recBtn.className = 'panel-btn done';
+      }
+      if (!recording && Personal.hasSound()) {
+        soundBtn('Play', function () { SoundManager.playWinner(true); });
+        soundBtn('Delete', function () { Personal.deleteSound(); renderSound(); });
+      }
+    }
+    personalUI = renderSound;
+    renderSound();
+    box.appendChild(sRow);
+
+    // Winning message
+    var mRow = document.createElement('div');
+    mRow.className = 'tune-row';
+    var mLabel = document.createElement('div');
+    mLabel.className = 'tune-label';
+    mLabel.textContent = 'Show winning message';
+    var mHelp = document.createElement('div');
+    mHelp.className = 'tune-help';
+    mHelp.textContent = 'Shows your message on screen when someone wins in Pick one.';
+    mLabel.appendChild(mHelp);
+    var mCtrl = document.createElement('div');
+    mCtrl.className = 'tune-control';
+    var toggle = document.createElement('label');
+    toggle.className = 'switch';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = Personal.getMessage().on;
+    var slider = document.createElement('span');
+    slider.className = 'slider';
+    toggle.appendChild(cb);
+    toggle.appendChild(slider);
+    mCtrl.appendChild(toggle);
+    mRow.appendChild(mLabel);
+    mRow.appendChild(mCtrl);
+    box.appendChild(mRow);
+
+    var tRow = document.createElement('div');
+    tRow.className = 'tune-row';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tune-text';
+    input.maxLength = Personal.MAX_CHARS;
+    input.placeholder = 'Your winning message';
+    input.value = Personal.getMessage().text;
+    input.setAttribute('aria-label', 'Winning message');
+    tRow.appendChild(input);
+    box.appendChild(tRow);
+
+    cb.addEventListener('change', function () {
+      Personal.setMessage(cb.checked, input.value);
+      requestDraw();
+    });
+    input.addEventListener('input', function () {
+      // Typing a first message switches it on
+      if (!cb.checked && input.value.trim() && !Personal.getMessage().text.trim()) cb.checked = true;
+      Personal.setMessage(cb.checked, input.value);
+      requestDraw();
+    });
+
+    content.appendChild(box);
   }
 
   function init() {
@@ -1515,6 +1809,7 @@
 
     syncSound();
     syncWakeLock();
+    setupInstall();
     Settings.addChangeListener(function (key) {
       if (key === 'all' || /^(color_variety|saturation|value_even|random_hue|base_hue|bg_saturation|bg_value)$/.test(key)) palette.refresh();
       if (key === 'all' || key === 'sound_enabled' || key === 'sound_volume') syncSound();
@@ -1524,6 +1819,7 @@
     });
     document.addEventListener('visibilitychange', syncWakeLock);
     whenIdle(warmAtlases);
+    whenIdle(function () { Personal.init(); });
     setupServiceWorker();
     requestDraw();
   }

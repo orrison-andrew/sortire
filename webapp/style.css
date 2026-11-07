@@ -77,6 +77,25 @@ html, body {
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
+.install-body {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.install-body p {
+  margin-bottom: 8px;
+}
+
+.install-body ol {
+  padding-left: 22px;
+}
+
+.install-body li {
+  margin-bottom: 6px;
+}
+
 #tune-btn:active {
   transform: scale(0.92);
   background: rgba(0, 0, 0, 0.65);
@@ -427,4 +446,33 @@ input:checked + .slider:before {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Wrapped settings rows (label on top, controls full width underneath) */
+.tune-row.stack {
+  flex-wrap: wrap;
+}
+
+.tune-row.stack .tune-control {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.tune-text {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: #FFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+/* The page blocks text selection everywhere, which also stops typing on iPhone */
+input[type="text"],
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }

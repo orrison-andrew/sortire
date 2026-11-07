@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './rocktexture.js',
   './effects.js',
   './sound.js',
+  './personal.js',
   './settings.js',
   './surface-mode.js',
   './table.js',

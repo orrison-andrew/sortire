@@ -274,10 +274,63 @@
     synthPing(ctx, ctx.currentTime);
   }
 
-  function playWinner() {
-    if (!enabled) return;
+  // ── Custom winning sound (a recording, decoded once) ──────────────────────
+  var customBuf = null;
+  var customGain = 1;
+
+  function dataUrlToBuffer(url) {
+    var bin = atob(url.slice(url.indexOf(',') + 1));
+    var u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8.buffer;
+  }
+
+  // Works with both the promise and the older callback form of decodeAudioData
+  function decode(ctx, ab) {
+    return new Promise(function (resolve, reject) {
+      var p = ctx.decodeAudioData(ab, resolve, reject);
+      if (p && p.then) p.then(resolve, reject);
+    });
+  }
+
+  // Resolves true when the recording was decoded and is now the winning sound.
+  // A recording that fails to decode leaves the current sound untouched.
+  function setCustomWinner(url) {
+    return new Promise(function (resolve) {
+      try {
+        var ctx = getAudioContext();
+        if (!ctx) return resolve(false);
+        decode(ctx, dataUrlToBuffer(url)).then(function (buf) {
+          var peak = 0;
+          for (var c = 0; c < buf.numberOfChannels; c++) {
+            var d = buf.getChannelData(c);
+            for (var i = 0; i < d.length; i++) { var a = Math.abs(d[i]); if (a > peak) peak = a; }
+          }
+          customBuf = buf;
+          customGain = peak > 0.001 ? Math.min(4, 0.9 / peak) : 1;   // quiet recordings are brought up
+          resolve(true);
+        }, function () { resolve(false); });
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  function clearCustomWinner() { customBuf = null; }
+
+  // force = play even when sound effects are switched off (used by the Play preview button)
+  function playWinner(force) {
+    if (!enabled && force !== true) return;
     var ctx = getAudioContext();
     if (!ctx) return;
+    if (customBuf) {
+      var src = ctx.createBufferSource();
+      var g = ctx.createGain();
+      src.buffer = customBuf;
+      g.gain.value = customGain;
+      src.connect(g);
+      g.connect(dest(ctx));
+      src.start();
+      return;
+    }
     var t = ctx.currentTime;
     // Cheerful arpeggio chord
     var notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
@@ -306,6 +359,8 @@
     playClick: playClick,
     playTick: playTick,
     playWinner: playWinner,
+    setCustomWinner: setCustomWinner,
+    clearCustomWinner: clearCustomWinner,
     STYLE_NAMES: ['Pop', 'Bubble', 'Blip', 'Laser', 'Snap', 'Beep', 'Thud', 'Ping', 'Boing', 'Click']
   };
 })(typeof window !== 'undefined' ? window : this);
