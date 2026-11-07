@@ -16,14 +16,14 @@
  *   getColors(k)            -> { light, dark }
  *   generate(k, size, seed) -> <canvas> (never null: falls back to a flat gradient)
  *   master(k, seed)         -> table-size texture (small LRU)
- *   getDiscCanvas(diameter, k, seed, shade) -> shaded puck <canvas> (LRU)
- *   warm(k)                 -> pre-generate the disc atlas for a material
+ *   getDiscCanvas(diameter, k, seed, shade) -> shaded puck <canvas> with its own unique grain
+ *   warm()                  -> compile the texture generator ahead of the first touch
  *   createBackground(container) -> TableLayer
  */
 (function (root) {
   'use strict';
 
-  var DISC_SIZE = 1024;   // shared per-material atlas that disc faces crop from
+  var DISC_SIZE = 1024;   // largest per-disc grain texture
   var BG_SIZE = 2048;     // table texture
 
   function create(def) {
@@ -57,21 +57,15 @@
       return masterCache.get(id) || masterCache.set(id, generate(k, BG_SIZE, seed));
     }
 
-    // Disc atlas: ONE texture per material; every disc crops from it
-    var atlasCache = {};
-    function atlas(k) {
-      if (!atlasCache[k]) atlasCache[k] = generate(k, DISC_SIZE, 42);
-      return atlasCache[k];
-    }
-
-    // Finger discs stay referenced by live fingers, so evicted ones are not freed
-    var discCache = GLUtil.lru(64);
+    // Every disc gets its OWN grain: a texture generated from the disc's seed, used once
+    // and dropped with the disc (nothing is cached). The face shows a 55% window of it,
+    // so the texture is generated large enough for that window to match the disc size.
     function getDiscCanvas(diameter, k, seed, shade) {
       k = hasKey(k) ? k : keys[0];
       diameter = Math.max(32, diameter | 0);
-      shade = shade || 0;
-      var id = k + '_' + diameter + '_' + (seed | 0) + '_' + shade.toFixed(2);
-      return discCache.get(id) || discCache.set(id, Disc.render(atlas(k), diameter, seed, shade, { pebble: def.discShape === 'pebble' }));
+      var size = Math.max(64, Math.min(DISC_SIZE, Math.ceil(diameter / 0.55)));
+      var grain = generate(k, size, ((seed | 0) * 7 + 13) | 0);
+      return Disc.render(grain, diameter, seed, shade || 0, { pebble: def.discShape === 'pebble' });
     }
 
     var api = {
@@ -84,7 +78,7 @@
       generate: generate,
       master: master,
       getDiscCanvas: getDiscCanvas,
-      warm: function (k) { atlas(hasKey(k) ? k : keys[0]); }   // pre-generate a disc atlas
+      warm: function () { generate(keys[0], 32, 1); }   // compile the generator before the first touch
     };
     api.createBackground = function (container) { return TableLayer.create(container, api); };
     return api;

@@ -53,10 +53,9 @@
     { key: 'haptic_tick', group: 'AUDIO', label: 'Haptic on reveal', def: 1, isBool: true },
     { key: 'haptic_result', group: 'AUDIO', label: 'Haptic on final result', def: 1, isBool: true },
 
-    { key: 'hue_step', group: 'COLORS', label: 'Hue jump per finger', def: 137.5, min: 10, max: 180, step: 0.5, unit: '°' },
-    { key: 'saturation', group: 'COLORS', label: 'Finger saturation', def: 0.85, min: 0.1, max: 1.0, step: 0.05 },
-    { key: 'value_even', group: 'COLORS', label: 'Brightness (even)', def: 0.95, min: 0.1, max: 1.0, step: 0.05 },
-    { key: 'value_odd', group: 'COLORS', label: 'Brightness (odd)', def: 0.85, min: 0.1, max: 1.0, step: 0.05 },
+    { key: 'color_variety', group: 'COLORS', label: 'Color variety', def: 1, min: 0, max: 1, step: 0.05 },
+    { key: 'saturation', group: 'COLORS', label: 'Color saturation', def: 0.85, min: 0.1, max: 1.0, step: 0.05 },
+    { key: 'value_even', group: 'COLORS', label: 'Color brightness', def: 0.95, min: 0.1, max: 1.0, step: 0.05 },
     { key: 'random_hue', group: 'COLORS', label: 'Random background color', def: 1, isBool: true },
     { key: 'base_hue', group: 'COLORS', label: 'Fixed bg hue (if not random)', def: 210, min: 0, max: 360, step: 1, unit: '°' },
     { key: 'bg_saturation', group: 'COLORS', label: 'Background saturation', def: 0.15, min: 0, max: 1, step: 0.05 },
@@ -143,10 +142,9 @@
     haptic_tap: 'Short vibration when a finger lands (Android only).',
     haptic_tick: 'Short vibration as each number is revealed (Android only).',
     haptic_result: 'Longer vibration pattern when the final result appears (Android only).',
-    hue_step: 'How far the colour hue jumps between one finger and the next.',
-    saturation: 'How vivid the finger colours are.',
-    value_even: 'Brightness of the 1st, 3rd, 5th\u2026 finger colours.',
-    value_odd: 'Brightness of the 2nd, 4th, 6th\u2026 finger colours.',
+    color_variety: 'How wide the mix of pale, vivid and deep colours is (0 = all alike in tone).',
+    saturation: 'How vivid the finger colours are overall.',
+    value_even: 'How light or dark the finger colours are overall.',
     random_hue: 'Picks a new random background colour each round (ignored after a win while "Winner claims background" is on).',
     base_hue: 'The background colour to use when random background colour is off.',
     bg_saturation: 'How colourful the background is.',
@@ -380,8 +378,11 @@
     ['order_pending_scale', 0.2, 1.0, 0.05],
     ['order_pending_alpha', 0, 1.0, 0.05],
     // Append new fields BELOW this line, never above (older codes must keep decoding)
-    ['disc_shadow', 0, 1, 0.05]
+    ['disc_shadow', 0, 1, 0.05],
+    ['color_variety', 0, 1, 0.05]
   ];
+  // Note: 'hue_step' and 'value_odd' are no longer settings (finger colours now come from a
+  // 100-colour palette) but must stay in this list so older codes keep decoding.
 
 
   function encode() {
@@ -465,30 +466,6 @@
     return { ok: true };
   }
 
-  // ── JSON backup (everything, including every surface's profile) ───────────
-  function dumpJson() { flush(); return JSON.stringify({ state: state, profiles: profiles }, null, 2); }
-  function importJson(txt) {
-    try {
-      var parsed = JSON.parse(txt);
-      var st = parsed.state || parsed;               // also accepts the old flat format
-      SETTINGS_SCHEMA.forEach(function (s) {
-        var v = Number(st[s.key]);
-        if (st[s.key] === undefined || !isFinite(v)) return;
-        if (s.min !== undefined) v = Math.max(s.min, Math.min(s.max, v));
-        else if (s.isBool) v = v ? 1 : 0;
-        state[s.key] = v;
-      });
-      if (state.woodgrain_enabled && state.rockgrain_enabled) state.rockgrain_enabled = 0;
-      if (parsed.profiles) {
-        SURFACES.forEach(function (m) { if (parsed.profiles[m]) profiles[m] = parsed.profiles[m]; });
-        applyProfile(currentMode());
-      }
-      save(true);
-      notify('all', null);
-      return true;
-    } catch (e) { return false; }
-  }
-
   // ── Saved tunings (each belongs to one surface) ───────────────────────────
   function allSaved() {
     try {
@@ -544,8 +521,6 @@
     decode: decode,
     modeOfCode: modeOfCode,
     applyCode: applyCode,
-    dumpJson: dumpJson,
-    importJson: importJson,
     listSaved: listSaved,
     saveCode: saveCode,
     deleteSaved: deleteSaved,

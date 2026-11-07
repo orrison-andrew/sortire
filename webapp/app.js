@@ -107,18 +107,57 @@
     lastWinnerSeed = 0;
   }
 
+  // ── Finger colours ────────────────────────────────────────────────────────
+  // A palette of 100 colours. Hues walk round the wheel by the golden angle, and each
+  // colour gets a different tone (pale, vivid, deep, muted...), so neighbours in the
+  // list look nothing alike. A new finger takes the palette colour that is furthest
+  // (in perceived colour) from every colour already on screen, so no two match.
+  var PALETTE_SIZE = 100;
+  var GOLDEN_ANGLE = 137.508;
+  var COLOR_TONES = [   // [saturation, brightness]
+    [0.95, 0.96], [0.50, 1.00], [0.85, 0.74], [0.28, 0.96], [1.00, 0.58],
+    [0.70, 1.00], [0.42, 0.70], [0.90, 0.88], [0.60, 0.86], [1.00, 0.78]
+  ];
+
+  function rgbToLab(c) {
+    function lin(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    function f(t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116; }
+    var r = lin(c.r), g = lin(c.g), b = lin(c.b);
+    var x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
+    var y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
+    var z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  }
+
+  function labDistance(a, b) {
+    var dl = a[0] - b[0], da = a[1] - b[1], db = a[2] - b[2];
+    return Math.sqrt(dl * dl + da * da + db * db);
+  }
+
+  function buildPalette(hueOffset, satScale, briScale, variety) {
+    var list = [];
+    for (var i = 0; i < PALETTE_SIZE; i++) {
+      var tone = COLOR_TONES[i % COLOR_TONES.length];
+      var s = 0.9 + (tone[0] - 0.9) * variety;      // variety 0: every colour vivid; 1: full mix of tones
+      var v = 0.9 + (tone[1] - 0.9) * variety;
+      list.push(hsvToRgb(hueOffset + i * GOLDEN_ANGLE,
+                         Math.max(0.05, Math.min(1, s * satScale)),
+                         Math.max(0.15, Math.min(1, v * briScale))));
+    }
+    return list;
+  }
+
   function Palette() {
-    this.baseHue = Math.random() * 360;   // first finger hue
+    this.baseHue = Math.random() * 360;   // where the palette starts on the colour wheel (new every round)
     this.bgHue = Math.random() * 360;     // random background hue, fixed for the round
     this.refresh();
   }
 
   // Re-read the colour settings, so their sliders take effect immediately
   Palette.prototype.refresh = function () {
-    this.hueStep = Settings.get('hue_step');
-    this.saturation = Settings.get('saturation');
-    this.valueEven = Settings.get('value_even');
-    this.valueOdd = Settings.get('value_odd');
+    this.colors = buildPalette(this.baseHue, Settings.get('saturation') / 0.85,
+                               Settings.get('value_even') / 0.95, Settings.get('color_variety'));
+    this.labs = this.colors.map(rgbToLab);
 
     if (Settings.bool('winner_bg_enabled') && lastWinnerColor) {
       var hsv = rgbToHsv(lastWinnerColor.r, lastWinnerColor.g, lastWinnerColor.b);
@@ -130,10 +169,16 @@
     }
   };
 
-  Palette.prototype.color = function (index) {
-    var hue = (this.baseHue + index * this.hueStep) % 360;
-    var value = (index % 2 === 0) ? this.valueEven : this.valueOdd;
-    return hsvToRgb(hue, this.saturation, value);
+  // The palette colour furthest from every colour in `used` (a little random among the best)
+  Palette.prototype.pick = function (used) {
+    var usedLabs = used.map(rgbToLab);
+    var scored = this.colors.map(function (c, i) {
+      var d = usedLabs.length ? Infinity : Math.random();
+      for (var u = 0; u < usedLabs.length; u++) d = Math.min(d, labDistance(this.labs[i], usedLabs[u]));
+      return { c: c, d: d };
+    }, this);
+    scored.sort(function (p, q) { return q.d - p.d; });
+    return scored[Math.floor(Math.random() * Math.min(6, scored.length))].c;
   };
 
   var canvas = document.getElementById('arena');
@@ -143,7 +188,6 @@
   var fingers = {};
   var fingerIds = [];
   var palette = new Palette();
-  var nextColorIndex = 0;
   var phase = 'WAITING';
   var countdownStart = 0;
   var resultStart = 0;
@@ -343,7 +387,6 @@
     ranking = [];
     winnerId = null;
     revealed = 0;
-    nextColorIndex = 0;
     phase = 'WAITING';
     palette = new Palette();
 
@@ -445,6 +488,25 @@
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
+  // Discs of the same wood/stone get different shades (a little lighter or darker),
+  // each as far as possible from the shades already on screen
+  var SHADE_RANGE = 0.22;
+  function pickShade(field, key) {
+    var used = [];
+    fingerIds.forEach(function (id) {
+      var f = fingers[id];
+      if (f && f[field] === key) used.push(f.shadeShift);
+    });
+    var best = 0, bestGap = -1;
+    for (var n = 0; n < 12; n++) {
+      var c = (Math.random() * 2 - 1) * SHADE_RANGE;
+      var gap = Infinity;
+      for (var u = 0; u < used.length; u++) gap = Math.min(gap, Math.abs(used[u] - c));
+      if (gap > bestGap) { bestGap = gap; best = c; }
+    }
+    return best;
+  }
+
   function addFinger(id, x, y) {
     id = String(id);
     SoundManager.unlock();
@@ -459,9 +521,12 @@
 
     var discWood = pickDiscKey(WoodGrain, currentTableWood() || getBaseWoodTypeKey(), 'discSpecies');
     var discRock = pickDiscKey(RockTexture, currentTableRock() || getBaseRockTypeKey(), 'discRockType');
-    var shadeShift = (Math.random() * 0.5 - 0.25);
+    var surfMode = SurfaceMode.getActiveMode();
+    var shadeShift = pickShade(surfMode === SurfaceMode.MODES.STONE ? 'discRockType' : 'discSpecies',
+                               surfMode === SurfaceMode.MODES.STONE ? discRock : discWood);
     var seed = Math.floor(Math.random() * 100000);
-    var color = palette.color(nextColorIndex++);
+    var inUse = fingerIds.map(function (fid) { return fingers[fid].color; });
+    var color = palette.pick(inUse);
 
     fingers[id] = new Finger(x, y, color, discWood, seed, shadeShift, discRock);
     fingerIds.push(id);
@@ -956,18 +1021,10 @@
     else setTimeout(fn, 250);
   }
 
-  // Generate the disc textures of the active surface in idle time, one per slice,
-  // so the first touch of each material doesn't wait for the GPU
+  // Compile the active surface's texture generator in idle time, so the first finger isn't delayed
   function warmAtlases() {
     var set = surfaceSet(SurfaceMode.getActiveMode());
-    if (!set || !set.warm) return;
-    var keys = set.KEYS.slice();
-    var i = 0;
-    (function step() {
-      if (i >= keys.length) return;
-      set.warm(keys[i++]);
-      whenIdle(step);
-    })();
+    if (set && set.warm) set.warm();
   }
 
   var communityCodes = [];
@@ -1164,26 +1221,6 @@
 
     var surface = SurfaceMode.getActiveMode();
 
-    var surfHeader = document.createElement('div');
-    surfHeader.className = 'panel-group-title';
-    surfHeader.textContent = 'Surface';
-    content.appendChild(surfHeader);
-
-    var surfBox = document.createElement('div');
-    surfBox.className = 'panel-group mode-box';
-    Settings.SURFACES.forEach(function (sf) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'mode-pill-panel' + (surface === sf ? ' active' : '');
-      btn.textContent = SURFACE_LABELS[sf];
-      btn.addEventListener('click', function () {
-        SoundManager.playClick();
-        selectSurface(sf);
-      });
-      surfBox.appendChild(btn);
-    });
-    content.appendChild(surfBox);
-
     var modeHeader = document.createElement('div');
     modeHeader.className = 'panel-group-title';
     modeHeader.textContent = 'Game Mode';
@@ -1205,6 +1242,58 @@
       })(MODES[mKey]);
     }
     content.appendChild(modeBox);
+
+    var surfHeader = document.createElement('div');
+    surfHeader.className = 'panel-group-title';
+    surfHeader.textContent = 'Surface';
+    content.appendChild(surfHeader);
+
+    var surfBox = document.createElement('div');
+    surfBox.className = 'panel-group mode-box';
+    Settings.SURFACES.forEach(function (sf) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mode-pill-panel' + (surface === sf ? ' active' : '');
+      btn.textContent = SURFACE_LABELS[sf];
+      btn.addEventListener('click', function () {
+        SoundManager.playClick();
+        selectSurface(sf);
+      });
+      surfBox.appendChild(btn);
+    });
+    content.appendChild(surfBox);
+
+    // Import / copy / reset sit right under the two selectors
+    var toolsBox = document.createElement('div');
+    toolsBox.className = 'panel-group code-section';
+    var toolsRow = document.createElement('div');
+    toolsRow.className = 'code-btn-row';
+    toolsRow.style.margin = '0';
+
+    function toolBtn(label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'panel-btn';
+      b.textContent = label;
+      b.addEventListener('click', function () { SoundManager.playClick(); fn(b); });
+      toolsRow.appendChild(b);
+    }
+    toolBtn('Import', function () {
+      var modal = document.getElementById('import-modal');
+      var box = document.getElementById('import-text');
+      if (!modal) return;
+      if (box) box.value = '';
+      modal.classList.add('visible');
+    });
+    toolBtn('Copy', function (b) { copyText(Settings.dump(), b, 'Copy'); });
+    toolBtn('Reset', function () {
+      Settings.resetAll();
+      clearWinnerTable();
+      buildTuningPanel();
+      reset();
+    });
+    toolsBox.appendChild(toolsRow);
+    content.appendChild(toolsBox);
 
     buildCodesSection(content);
 
@@ -1380,13 +1469,9 @@
     var tuneBtn = document.getElementById('tune-btn');
     var panel = document.getElementById('tuning-panel');
     var doneBtn = document.getElementById('tune-done');
-    var resetBtn = document.getElementById('tune-reset');
-    var copyBtn = document.getElementById('tune-copy');
-    var copyJsonBtn = document.getElementById('tune-copy-json');
-    var importBtn = document.getElementById('tune-import');
 
     var importModal = document.getElementById('import-modal');
-    var importJsonText = document.getElementById('import-json-text');
+    var importText = document.getElementById('import-text');
     var importSubmit = document.getElementById('import-submit');
     var importCancel = document.getElementById('import-cancel');
 
@@ -1411,38 +1496,6 @@
       });
     }
 
-    if (resetBtn) {
-      resetBtn.addEventListener('click', function () {
-        SoundManager.playClick();
-        Settings.resetAll();
-        clearWinnerTable();
-        buildTuningPanel();
-        reset();
-      });
-    }
-
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        SoundManager.playClick();
-        copyText(Settings.dump(), copyBtn, 'Copy');
-      });
-    }
-
-    if (copyJsonBtn) {
-      copyJsonBtn.addEventListener('click', function () {
-        SoundManager.playClick();
-        copyText(Settings.dumpJson(), copyJsonBtn, 'JSON');
-      });
-    }
-
-    if (importBtn && importModal) {
-      importBtn.addEventListener('click', function () {
-        SoundManager.playClick();
-        importJsonText.value = '';
-        importModal.classList.add('visible');
-      });
-    }
-
     if (importCancel && importModal) {
       importCancel.addEventListener('click', function () {
         SoundManager.playClick();
@@ -1453,24 +1506,16 @@
     if (importSubmit && importModal) {
       importSubmit.addEventListener('click', function () {
         SoundManager.playClick();
-        var txt = importJsonText.value.trim();
+        var txt = importText.value.trim();
         if (!txt) return;
-        var ok, err;
-        if (txt.charAt(0) === '{') {
-          ok = Settings.importJson(txt);
-          err = 'Invalid JSON configuration';
-        } else {
-          var r = Settings.applyCode(txt);
-          ok = r.ok;
-          err = r.error;
-        }
-        if (ok) {
+        var r = Settings.applyCode(txt);
+        if (r.ok) {
           importModal.classList.remove('visible');
           clearWinnerTable();
           buildTuningPanel();
           reset();
         } else {
-          alert(err);
+          alert(r.error);
         }
       });
     }
@@ -1478,7 +1523,7 @@
     syncSound();
     syncWakeLock();
     Settings.addChangeListener(function (key) {
-      if (key === 'all' || /^(hue_step|saturation|value_even|value_odd|random_hue|base_hue|bg_saturation|bg_value)$/.test(key)) palette.refresh();
+      if (key === 'all' || /^(color_variety|saturation|value_even|random_hue|base_hue|bg_saturation|bg_value)$/.test(key)) palette.refresh();
       if (key === 'all' || key === 'sound_enabled' || key === 'sound_volume') syncSound();
       if (key === 'all' || key === 'keep_awake') syncWakeLock();
       requestDraw();
