@@ -1203,9 +1203,38 @@
       applyCodeAndRefresh(pool[Math.floor(Math.random() * pool.length)]);
     });
 
+    var importBtn = document.createElement('button');
+    importBtn.type = 'button';
+    importBtn.className = 'panel-btn';
+    importBtn.textContent = 'Import';
+    importBtn.title = 'Paste a settings code';
+    importBtn.addEventListener('click', function () {
+      SoundManager.playClick();
+      var modal = document.getElementById('import-modal');
+      var text = document.getElementById('import-text');
+      if (!modal) return;
+      if (text) text.value = '';
+      modal.classList.add('visible');
+    });
+
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'panel-btn';
+    resetBtn.textContent = 'Reset';
+    resetBtn.title = 'Put every setting back to its default';
+    resetBtn.addEventListener('click', function () {
+      SoundManager.playClick();
+      Settings.resetAll();
+      clearWinnerTable();
+      buildTuningPanel();
+      reset();
+    });
+
     btnRow.appendChild(saveBtn);
     btnRow.appendChild(copyBtn);
+    btnRow.appendChild(importBtn);
     btnRow.appendChild(shuffleBtn);
+    btnRow.appendChild(resetBtn);
     box.appendChild(btnRow);
 
     renderSavedList(savedWrap);
@@ -1262,38 +1291,6 @@
       surfBox.appendChild(btn);
     });
     content.appendChild(surfBox);
-
-    // Import / copy / reset sit right under the two selectors
-    var toolsBox = document.createElement('div');
-    toolsBox.className = 'panel-group code-section';
-    var toolsRow = document.createElement('div');
-    toolsRow.className = 'code-btn-row';
-    toolsRow.style.margin = '0';
-
-    function toolBtn(label, fn) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'panel-btn';
-      b.textContent = label;
-      b.addEventListener('click', function () { SoundManager.playClick(); fn(b); });
-      toolsRow.appendChild(b);
-    }
-    toolBtn('Import', function () {
-      var modal = document.getElementById('import-modal');
-      var box = document.getElementById('import-text');
-      if (!modal) return;
-      if (box) box.value = '';
-      modal.classList.add('visible');
-    });
-    toolBtn('Copy', function (b) { copyText(Settings.dump(), b, 'Copy'); });
-    toolBtn('Reset', function () {
-      Settings.resetAll();
-      clearWinnerTable();
-      buildTuningPanel();
-      reset();
-    });
-    toolsBox.appendChild(toolsRow);
-    content.appendChild(toolsBox);
 
     buildCodesSection(content);
 

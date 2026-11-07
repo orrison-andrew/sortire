@@ -112,7 +112,7 @@
   // Built-in default tunings (exported from the app). Stone starts from the wood one.
   var DEFAULT_CODES = {
     WOOD:  'RA7R3EKDQYRBQ47XXYXSWBDPAAUSCHJGUIGQHKOIYYUMA',
-    COLOR: 'QS7R3EKDQ4SBQ47XXYXSWBDPGOUSCXQGUIGQHKOIYYUMA'
+    COLOR: 'QS7R3EKDQ4SBQ4AQXIQSGVKPGOUSFWQGUIGQHKOIYYUMUIB'
   };
 
   function isFlag(key) { return key === 'woodgrain_enabled' || key === 'rockgrain_enabled'; }
