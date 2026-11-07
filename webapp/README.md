@@ -4,7 +4,7 @@
 
 Use it to pick who starts a game, who gets the last slice, or who has to do the dishes. Everyone touches the screen, a short countdown runs, and one finger is chosen (or everyone gets a number).
 
-## 👉 [Open Sortire](https://YOUR-APP-URL-HERE/)
+## 👉 [Open Sortire](https://orrison-andrew.github.io/sortire/)
 
 That link works right now, in your browser. There is nothing to download, no account and no app store. If you like it, you can add it to your home screen so it works like any other app (see below).
 
